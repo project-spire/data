@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/project-spire/spire-game-data/data/data.schema.json",
+  "$id": "spire.data.schema.json",
   "type": "object",
   "properties": {
     "data": {
@@ -14,13 +14,11 @@
             "enum": ["collection", "document"]
           }
         },
-        "required": ["type", "properties"],
+        "required": ["path", "kind"],
         "additionalProperties": false
       },
-      "title": "Data",
-      "description": "Declarations of data"
+      "uniqueItems": true
     }
   },
-  "required": ["data"],
-  "additionalProperties": false
+  "required": ["data"]
 }
