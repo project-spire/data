@@ -1,1 +1,1 @@
-# spire-game-data
+# Spire Game Data
