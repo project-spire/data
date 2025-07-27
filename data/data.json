@@ -1,0 +1,4 @@
+[
+    { "file": "character/Race.ods", "schema": "character/Race.schema.json" },
+    { "file": "character/RaceStat.ods", "schema": "character/RaceStat.schema.json" }
+]

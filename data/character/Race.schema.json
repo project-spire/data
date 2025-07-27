@@ -1,19 +1,22 @@
 {
     "$schema": "../schema.json",
-    "tables": {
-        "name": "Race",
-        "sheet": "Race",
-        "fields": [
-            {
-                "name": "id",
-                "type": "scalar",
-                "$type": "id"
-            },
-            {
-                "name": "name",
-                "type": "scalar",
-                "$type": "str"
-            }
-        ]
-    }
+    "tables": [
+        {
+            "name": "Race",
+            "kind": "concrete",
+            "sheet": "Race",
+            "fields": [
+                {
+                    "name": "id",
+                    "kind": "scalar",
+                    "type": "id"
+                },
+                {
+                    "name": "name",
+                    "kind": "scalar",
+                    "type": "str"
+                }
+            ]
+        }
+    ]
 }

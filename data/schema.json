@@ -2,12 +2,7 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
-        "tables": {
-            "oneOf": [
-                { "type": "array", "items": { "$ref": "#/$defs/table" } },
-                { "$ref": "#/$defs/table" }
-            ]
-        }
+        "tables": { "type": "array", "items": { "$ref": "#/$defs/table" } }
     },
     "required": ["tables"],
     "$defs": {
@@ -26,8 +21,8 @@
             "oneOf": [
                 {
                     "properties": {
-                        "type": { "const": "scalar" },
-                        "$type": { "enum": [
+                        "kind": { "const": "scalar" },
+                        "type": { "enum": [
                             "id",
                             "bool",
                             "int8",
@@ -45,24 +40,24 @@
                             "duration"
                         ] }
                     },
-                    "required": ["type", "$type"]
+                    "required": ["kind", "type"]
                 },
                 {
                     "properties": {
-                        "type": { "const": "enum" },
-                        "$type": { "type": "string" }
+                        "kind": { "const": "enum" },
+                        "type": { "type": "string" }
                     },
-                    "required": ["type", "$type"]
+                    "required": ["kind", "type"]
                 },
                 {
                     "properties": {
-                        "type": { "const": "link" },
-                        "$type": { "type": "string" }
+                        "kind": { "const": "link" },
+                        "type": { "type": "string" }
                     },
-                    "required": ["type", "$type"]
+                    "required": ["kind", "type"]
                 }
             ],
-            "required": ["name", "type", "$type"],
+            "required": ["name", "kind", "type"],
             "additionalProperties": false
         },
         "index": {
@@ -72,12 +67,13 @@
             "type": "object",
             "properties": {
                 "name": { "type": "string" },
+                "kind": { "enum": ["concrete", "abstract"] },
                 "sheet": { "type": "string" },
                 "extend": { "type": "string" },
                 "fields": { "type": "array", "items": { "$ref": "#/$defs/field" } },
                 "indices": { "type": "array", "$ref": "#/$defs/index" }
             },
-            "required": ["name", "sheet", "fields"],
+            "required": ["name", "kind", "sheet", "fields"],
             "additionalProperties": false
         }
     }
