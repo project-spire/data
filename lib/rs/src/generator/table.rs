@@ -8,7 +8,7 @@ pub struct Table {
     pub fields: Vec<Field>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Copy, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum TableKind {
     Concrete,
@@ -71,8 +71,10 @@ impl FieldKind {
                 ScalarType::Datetime => "chrono::DateTime".to_string(),
                 ScalarType::Duration => "chrono::Duration".to_string(),
             },
-            FieldKind::Enum { .. } => todo!(),
-            FieldKind::Link { .. } => todo!(),
+            FieldKind::Enum { enum_type: t } => t.clone(),
+            FieldKind::Link { link_type: t } => {
+                format!("Link<'a, {}>", t)
+            },
         }
     }
 }
