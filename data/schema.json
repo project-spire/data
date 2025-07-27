@@ -1,0 +1,84 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "tables": {
+            "oneOf": [
+                { "type": "array", "items": { "$ref": "#/$defs/table" } },
+                { "$ref": "#/$defs/table" }
+            ]
+        }
+    },
+    "required": ["tables"],
+    "$defs": {
+        "constraint": {
+            "type": "object"
+        },
+        "field": {
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" },
+                "desc": { "type": "string" },
+                "optional": { "type": "boolean" },
+                "cardinality": { "enum": ["single", "multi"] },
+                "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraint" } }
+            },
+            "oneOf": [
+                {
+                    "properties": {
+                        "type": { "const": "scalar" },
+                        "$type": { "enum": [
+                            "id",
+                            "bool",
+                            "int8",
+                            "int16",
+                            "int32",
+                            "int64",
+                            "uint8",
+                            "uint16",
+                            "uint32",
+                            "uint64",
+                            "float32",
+                            "float64",
+                            "str",
+                            "datetime",
+                            "duration"
+                        ] }
+                    },
+                    "required": ["type", "$type"]
+                },
+                {
+                    "properties": {
+                        "type": { "const": "enum" },
+                        "$type": { "type": "string" }
+                    },
+                    "required": ["type", "$type"]
+                },
+                {
+                    "properties": {
+                        "type": { "const": "link" },
+                        "$type": { "type": "string" }
+                    },
+                    "required": ["type", "$type"]
+                }
+            ],
+            "required": ["name", "type", "$type"],
+            "additionalProperties": false
+        },
+        "index": {
+            "type": "object"
+        },
+        "table": {
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" },
+                "sheet": { "type": "string" },
+                "extend": { "type": "string" },
+                "fields": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+                "indices": { "type": "array", "$ref": "#/$defs/index" }
+            },
+            "required": ["name", "sheet", "fields"],
+            "additionalProperties": false
+        }
+    }
+}

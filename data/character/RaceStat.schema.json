@@ -1,0 +1,24 @@
+{
+    "$schema": "../schema.json",
+    "tables": {
+        "name": "RaceStat",
+        "sheet": "RaceStat",
+        "fields": [
+            {
+                "name": "id",
+                "type": "scalar",
+                "$type": "id"
+            },
+            {
+                "name": "race",
+                "type": "link",
+                "$type": "Race"
+            },
+            {
+                "name": "speed",
+                "type": "scalar",
+                "$type": "float32"
+            }
+        ]
+    }
+}
