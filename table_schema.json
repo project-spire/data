@@ -1,11 +1,28 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {
-        "tables": { "type": "array", "items": { "$ref": "#/$defs/table" } }
+    "type": "array",
+    "items": {
+        "$ref": "#/$defs/table"
     },
-    "required": ["tables"],
+    "minItems": 1,
     "$defs": {
+        "scalar": { "enum": [
+            "id",
+            "bool",
+            "int8",
+            "int16",
+            "int32",
+            "int64",
+            "uint8",
+            "uint16",
+            "uint32",
+            "uint64",
+            "float32",
+            "float64",
+            "str",
+            "datetime",
+            "duration"
+        ] },
         "constraint": {
             "type": "object"
         },
@@ -14,6 +31,7 @@
             "properties": {
                 "name": { "type": "string" },
                 "desc": { "type": "string" },
+                "target": { "enum": ["client", "server", "all"] },
                 "optional": { "type": "boolean" },
                 "cardinality": { "enum": ["single", "multi"] },
                 "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraint" } }
@@ -22,23 +40,7 @@
                 {
                     "properties": {
                         "kind": { "const": "scalar" },
-                        "type": { "enum": [
-                            "id",
-                            "bool",
-                            "int8",
-                            "int16",
-                            "int32",
-                            "int64",
-                            "uint8",
-                            "uint16",
-                            "uint32",
-                            "uint64",
-                            "float32",
-                            "float64",
-                            "str",
-                            "datetime",
-                            "duration"
-                        ] }
+                        "type": { "$ref": "#/$defs/scalar" }
                     },
                     "required": ["kind", "type"]
                 },
@@ -57,7 +59,7 @@
                     "required": ["kind", "type"]
                 }
             ],
-            "required": ["name", "kind", "type"],
+            "required": ["name", "kind", "type", "target"],
             "additionalProperties": false
         },
         "index": {

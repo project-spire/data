@@ -1,0 +1,21 @@
+[
+    {
+        "name": "Race",
+        "kind": "concrete",
+        "sheet": "Race",
+        "fields": [
+            {
+                "name": "id",
+                "kind": "scalar",
+                "type": "id",
+                "target": "all"
+            },
+            {
+                "name": "name",
+                "kind": "scalar",
+                "type": "str",
+                "target": "client"
+            }
+        ]
+    }
+]

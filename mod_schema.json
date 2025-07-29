@@ -1,0 +1,16 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "array",
+    "items": { "$ref": "#/$defs/mod" },
+    "minItems": 1,
+    "$defs": {
+        "mod": {
+            "type": "object",
+            "properties": {
+                "file": { "type": "string" },
+                "schema": { "type": "string" }
+            },
+            "required": ["schema"]
+        }
+    }
+}
