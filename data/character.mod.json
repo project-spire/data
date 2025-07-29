@@ -1,4 +1,4 @@
 [
-    { "file": "character/Race.ods", "schema": "character/Race.schema.json" },
-    { "file": "character/RaceStat.ods", "schema": "character/RaceStat.schema.json" }
+    { "table": "race.ods", "schema": "race.table.json" },
+    { "table": "race_stat.ods", "schema": "race_stat.table.json" }
 ]
