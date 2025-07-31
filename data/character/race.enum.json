@@ -1,0 +1,15 @@
+{
+    "name": "Race",
+    "base": "uint16",
+    "enums": [
+        "Human",
+        "Orc"
+    ],
+    "target": "all",
+    "attributes": [
+        {
+            "target": "server",
+            "attribute": "#[derive(Debug, gel_derive::Queryable)]"
+        }
+    ]
+}

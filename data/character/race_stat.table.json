@@ -1,27 +1,29 @@
-[
-    {
-        "name": "RaceStat",
-        "kind": "concrete",
-        "sheet": "RaceStat",
-        "fields": [
-            {
-                "name": "id",
-                "kind": "scalar",
-                "type": "id",
-                "target": "all"
-            },
-            {
-                "name": "race",
-                "kind": "link",
-                "type": "character::Race",
-                "target": "all"
-            },
-            {
-                "name": "speed",
-                "kind": "scalar",
-                "type": "float32",
-                "target": "all"
-            }
-        ]
-    }
-]
+{
+    "name": "RaceStat",
+    "kind": "concrete",
+    "sheet": "RaceStat",
+    "fields": [
+        {
+            "name": "id",
+            "kind": "scalar",
+            "type": "id",
+            "target": "all"
+        },
+        {
+            "name": "race",
+            "kind": "enum",
+            "type": "character::Race",
+            "target": "all",
+            "constraints": ["exclusive"]
+        },
+        {
+            "name": "speed",
+            "kind": "scalar",
+            "type": "float32",
+            "target": "all"
+        }
+    ],
+    "indices": [
+        { "index": "race" }
+    ]
+}

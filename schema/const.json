@@ -6,28 +6,11 @@
     },
     "minItems": 1,
     "$defs": {
-        "scalar": { "enum": [
-            "id",
-            "bool",
-            "int8",
-            "int16",
-            "int32",
-            "int64",
-            "uint8",
-            "uint16",
-            "uint32",
-            "uint64",
-            "float32",
-            "float64",
-            "str",
-            "datetime",
-            "duration"
-        ] },
         "const": {
             "type": "object",
             "properties": {
                 "name": { "type": "string" },
-                "scalar_type": { "$ref": "#/$defs/scalar" },
+                "scalar_type": { "$ref": "scalar.json/#/$defs/scalar" },
                 "target": { "enum": ["client", "server", "all"] },
                 "desc": { "type": "string" }
             },

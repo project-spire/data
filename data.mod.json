@@ -1,4 +1,3 @@
 [
-    { "mod": "character.mod.json" },
-    { "const": "foo.const.json" }
+    { "mod": "character.mod.json" }
 ]

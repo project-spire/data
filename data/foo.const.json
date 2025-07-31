@@ -1,8 +1,0 @@
-[
-    {
-        "name": "Foo",
-        "scalar_type": "int32",
-        "target": "all",
-        "value": 1
-    }
-]

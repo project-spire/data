@@ -1,30 +1,21 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "array",
-    "items": {
-        "$ref": "#/$defs/table"
+    "type": "object",
+    "properties": {
+        "name": { "type": "string" },
+        "kind": { "enum": ["concrete", "abstract"] },
+        "sheet": { "type": "string" },
+        "extend": { "type": "string" },
+        "fields": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+        "indices": { "type": "array", "items": { "$ref": "#/$defs/index" } }
     },
-    "minItems": 1,
+    "required": ["name", "kind", "sheet", "fields"],
+    "additionalProperties": false,
     "$defs": {
-        "scalar": { "enum": [
-            "id",
-            "bool",
-            "int8",
-            "int16",
-            "int32",
-            "int64",
-            "uint8",
-            "uint16",
-            "uint32",
-            "uint64",
-            "float32",
-            "float64",
-            "str",
-            "datetime",
-            "duration"
-        ] },
         "constraint": {
-            "type": "object"
+            "oneOf": [
+                "exclusive"
+            ]
         },
         "field": {
             "type": "object",
@@ -40,7 +31,7 @@
                 {
                     "properties": {
                         "kind": { "const": "scalar" },
-                        "type": { "$ref": "#/$defs/scalar" }
+                        "type": { "$ref": "scalar.json/#/$defs/scalar" }
                     },
                     "required": ["kind", "type"]
                 },
@@ -63,19 +54,11 @@
             "additionalProperties": false
         },
         "index": {
-            "type": "object"
-        },
-        "table": {
             "type": "object",
             "properties": {
-                "name": { "type": "string" },
-                "kind": { "enum": ["concrete", "abstract"] },
-                "sheet": { "type": "string" },
-                "extend": { "type": "string" },
-                "fields": { "type": "array", "items": { "$ref": "#/$defs/field" } },
-                "indices": { "type": "array", "$ref": "#/$defs/index" }
+                "index": { "type": "string" }
             },
-            "required": ["name", "kind", "sheet", "fields"],
+            "required": ["index"],
             "additionalProperties": false
         }
     }

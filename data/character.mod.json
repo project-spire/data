@@ -1,4 +1,4 @@
 [
-    { "table": "race.ods", "schema": "race.table.json" },
+    { "enum": "race.enum.json" },
     { "table": "race_stat.ods", "schema": "race_stat.table.json" }
 ]

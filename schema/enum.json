@@ -1,0 +1,31 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "name": { "type": "string" },
+        "base": { "enum": ["uint8", "uint16", "uint32", "uint64"] },
+        "enums": {
+            "type": "array",
+            "items": { "type": "string", "minItems": 1 }
+        },
+        "attributes": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/attribute" }
+        },
+        "target": { "enum": ["client", "server", "all"] },
+        "desc": { "type": "string" }
+    },
+    "required": ["name", "base", "enums", "target"],
+    "additionalProperties": false,
+    "$defs": {
+        "attribute": {
+            "type": "object",
+            "properties": {
+                "target": { "enum": ["client", "server"] },
+                "attribute": { "type": "string" }
+            },
+            "required": ["target", "attribute"],
+            "additionalProperties": false
+        }
+    }
+}
