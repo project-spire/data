@@ -2,6 +2,7 @@
     "name": "Race",
     "base": "uint16",
     "enums": [
+        "None",
         "Human",
         "Orc"
     ],
@@ -9,7 +10,7 @@
     "attributes": [
         {
             "target": "server",
-            "attribute": "#[derive(Debug, gel_derive::Queryable)]"
+            "attribute": "#[derive(Debug, Clone, Copy, PartialEq, gel_derive::Queryable)]"
         }
     ]
 }

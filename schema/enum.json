@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "name": { "type": "string" },
-        "base": { "enum": ["uint8", "uint16", "uint32", "uint64"] },
+        "base": { "enum": ["uint8", "uint16", "uint32"] },
         "enums": {
             "type": "array",
             "items": { "type": "string", "minItems": 1 }
