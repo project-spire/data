@@ -1,0 +1,13 @@
+[package]
+name = "data"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+calamine = "0.30"
+gel-derive = { workspace = true }
+gel-protocol = { workspace = true }
+tracing = { workspace = true }
+
+[build-dependencies]
+generator = { path = "generator" }
