@@ -7,7 +7,7 @@ use std::fs;
 use crate::*;
 
 const TAB: &str = "    ";
-const CRATE_PREFIX: &str = "crate::data";
+const CRATE_PREFIX: &str = "crate";
 const GENERATED_FILE_WARNING: &str = r#"// This is a generated file. DO NOT MODIFY."#;
 
 

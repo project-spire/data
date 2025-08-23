@@ -7,14 +7,14 @@ pub enum Race {
 }
 
 impl Race {
-    pub fn parse(value: &calamine::Data) -> Result<Self, crate::data::LoadError> {
-        let enum_string = crate::data::parse_string(value)?;
+    pub fn parse(value: &calamine::Data) -> Result<Self, crate::LoadError> {
+        let enum_string = crate::parse_string(value)?;
 
         Ok(match enum_string.as_str() {
             "None" => Self::None,
             "Human" => Self::Human,
             "Orc" => Self::Orc,
-            _ => return Err(crate::data::LoadError::Parse(format!(
+            _ => return Err(crate::LoadError::Parse(format!(
                 "Invalid value \"{enum_string}\" for Race"
             ))),
         })

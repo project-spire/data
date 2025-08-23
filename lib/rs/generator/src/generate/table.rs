@@ -84,7 +84,7 @@ impl {table_type_name}{lifetime_code} {{
     }}
 }}
 
-impl{lifetime_code} crate::data::Linkable for {table_type_name}{lifetime_parameter_code} {{
+impl{lifetime_code} {CRATE_PREFIX}::Linkable for {table_type_name}{lifetime_parameter_code} {{
     fn get(id: DataId) -> Option<&'static Self> {{
         {data_type_name}::get(id)
     }}

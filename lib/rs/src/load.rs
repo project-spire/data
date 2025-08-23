@@ -1,10 +1,10 @@
 // This is a generated file. DO NOT MODIFY.
 use calamine::Reader;
 
-pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), crate::data::LoadError> {
-    type HandleType = tokio::task::JoinHandle<Result<(), crate::data::LoadError>>;
+pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), crate::LoadError> {
+    type HandleType = tokio::task::JoinHandle<Result<(), crate::LoadError>>;
 
-    fn add<T: crate::data::Loadable>(
+    fn add<T: crate::Loadable>(
         data_dir: &std::path::PathBuf,
         file_path: &str,
         sheet: &str,
@@ -24,7 +24,7 @@ pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), crate::data::
         }));
     }
 
-    async fn join(handles: Vec<HandleType>) -> Result<(), crate::data::LoadError> {
+    async fn join(handles: Vec<HandleType>) -> Result<(), crate::LoadError> {
         for handle in handles {
             match handle.await {
                 Ok(result) => result?,
@@ -36,7 +36,7 @@ pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), crate::data::
     }
 
     let mut level_0_handles = Vec::new();
-    add::<crate::data::character::RaceStatData>(&data_dir, "character/race_stat.ods", "RaceStat", &mut level_0_handles);
+    add::<crate::character::RaceStatData>(&data_dir, "character/race_stat.ods", "RaceStat", &mut level_0_handles);
 
     join(level_0_handles).await?;
 
