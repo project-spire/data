@@ -10,7 +10,7 @@
     "attributes": [
         {
             "target": "server",
-            "attribute": "#[derive(Debug, Clone, Copy, PartialEq, gel_derive::Queryable)]"
+            "attribute": "#[derive(Debug, Clone, Copy, PartialEq)]"
         }
     ]
 }

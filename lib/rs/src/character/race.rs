@@ -1,5 +1,5 @@
 // This is a generated file. DO NOT MODIFY.
-#[derive(Debug, Clone, Copy, PartialEq, gel_derive::Queryable)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Race {
     None,
     Human,
