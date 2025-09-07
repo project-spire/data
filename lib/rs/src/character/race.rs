@@ -1,5 +1,6 @@
 // This is a generated file. DO NOT MODIFY.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, sqlx::Type)]
+#[sqlx(type_name = "race")]
 pub enum Race {
     None,
     Human,

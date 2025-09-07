@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 calamine = "0.30"
+sqlx = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 

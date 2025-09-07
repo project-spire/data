@@ -10,7 +10,11 @@
     "attributes": [
         {
             "target": "server",
-            "attribute": "#[derive(Debug, Clone, Copy, PartialEq)]"
+            "attribute": "#[derive(Debug, Clone, Copy, PartialEq, sqlx::Type)]"
+        },
+        {
+            "target": "server",
+            "attribute": "#[sqlx(type_name = \"race\")]"
         }
     ]
 }
