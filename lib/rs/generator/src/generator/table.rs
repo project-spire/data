@@ -1,12 +1,77 @@
 use std::fs;
 use crate::*;
-use crate::generate::*;
+use crate::generator::*;
+
+#[derive(Debug)]
+pub struct TableEntry {
+    pub name: Name,
+    pub table_path: PathBuf,
+    pub schema: TableSchema,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TableSchema {
+    pub name: String,
+    pub kind: TableKind,
+    pub sheet: String,
+    pub fields: Vec<Field>,
+}
+
+#[derive(Debug, Deserialize, Copy, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum TableKind {
+    Concrete,
+    Abstract
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Field {
+    pub name: String,
+    #[serde(flatten)] pub kind: FieldKind,
+    #[serde(default)] pub desc: Option<String>,
+    #[serde(default)] pub optional: Option<bool>,
+    #[serde(default)] pub cardinality: Option<Cardinality>,
+    #[serde(default)] pub constraints: Option<Vec<Constraint>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum FieldKind {
+    Scalar { #[serde(rename = "type")] scalar_type: ScalarAllType },
+    Enum { #[serde(rename = "type")] enum_type: String },
+    Link { #[serde(rename = "type")] link_type: String }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ScalarAllType {
+    Id,
+    Bool,
+    Int8, Int16, Int32, Int64,
+    Uint8, Uint16, Uint32, Uint64,
+    Float32, Float64,
+    Str,
+    Datetime,
+    Duration,
+}
+
+#[derive(Debug, Deserialize)]
+pub enum Cardinality {
+    Single,
+    Multi
+}
+
+#[derive(Debug, Deserialize)]
+pub enum Constraint {
+    #[serde(rename = "exclusive")] Exclusive
+}
+
 
 impl Generator {
     pub fn generate_table(
         &self,
         table: &TableEntry
-    ) -> Result<(), GenerateError> {
+    ) -> Result<(), Error> {
         let table_dir = self.full_gen_dir(&table.name.namespaces);
         let code = table.generate()?;
 
@@ -20,14 +85,14 @@ impl Generator {
 }
 
 impl TableEntry {
-    fn generate(&self) -> Result<String, GenerateError> {
+    fn generate(&self) -> Result<String, Error> {
         match self.schema.kind {
             TableKind::Concrete => self.generate_concrete(),
-            TableKind::Abstract => todo!(),
+            TableKind::Abstract => self.generate_abstract(),
         }
     }
 
-    fn generate_concrete(&self) -> Result<String, GenerateError> {
+    fn generate_concrete(&self) -> Result<String, Error> {
         // Check fields
         let mut lifetime_code = String::new();
         let mut lifetime_parameter_code = String::new();
@@ -135,6 +200,10 @@ impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_param
             data_type_name = self.name.as_data_type(),
             table_type_name = self.name.as_type(false),
         ))
+    }
+
+    fn generate_abstract(&self) -> Result<String, Error> {
+        todo!()
     }
 }
 

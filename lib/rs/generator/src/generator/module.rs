@@ -1,12 +1,35 @@
 use std::fs;
 use crate::*;
-use crate::generate::*;
+use crate::generator::*;
+
+#[derive(Debug)]
+pub struct ModuleEntry {
+    pub name: Name,
+    pub entries: Vec<EntityEntry>,
+}
+
+#[derive(Debug)]
+pub enum EntityEntry {
+    ModuleIndex(usize),
+    TableIndex(usize),
+    EnumerationIndex(usize),
+    ConstantIndex(usize),
+}
+
+impl ModuleEntry {
+    pub fn new(name: Name) -> Self {
+        Self {
+            name,
+            entries: Vec::new(),
+        }
+    }
+}
 
 impl Generator {
     pub fn generate_module(
         &self,
         module: &ModuleEntry
-    ) -> Result<(), GenerateError> {
+    ) -> Result<(), Error> {
         let module_dir = self.full_gen_dir(&module.name.namespaces);
         fs::create_dir_all(&module_dir)?;
 
@@ -34,7 +57,7 @@ impl Generator {
         Ok(())
     }
 
-    fn generate_module_code(&self, module: &ModuleEntry) -> Result<String, GenerateError> {
+    fn generate_module_code(&self, module: &ModuleEntry) -> Result<String, Error> {
         let mut imports = Vec::new();
         let mut exports = Vec::new();
 
@@ -88,7 +111,7 @@ r#"{GENERATED_FILE_WARNING}
     fn generate_base_module_code(
         &self,
         _module: &ModuleEntry,
-    ) -> Result<String, GenerateError> {
+    ) -> Result<String, Error> {
         let mut level_handles = Vec::new();
         for (level, indices) in self.dependency_levels.iter().enumerate() {
             if indices.is_empty() {

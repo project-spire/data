@@ -3,6 +3,10 @@ use std::fs;
 use std::path::PathBuf;
 use serde::Deserialize;
 use crate::*;
+use crate::generator::constant::*;
+use crate::generator::enumeration::*;
+use crate::generator::module::*;
+use crate::generator::table::*;
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
@@ -23,25 +27,25 @@ enum EntityDeclaration {
 }
 
 impl EntityDeclaration {
-    fn validate(&self) -> Result<(), GenerateError> {
+    fn validate(&self) -> Result<(), Error> {
         fn check_schema_filename<'a>(
             filename: &'a str,
             expected_entity: &str
-        ) -> Result<&'a str, GenerateError> {
+        ) -> Result<&'a str, Error> {
             let components = filename.split('.').collect::<Vec<_>>();
             if components.len() != 3
                 || components[1] != expected_entity
                 || components[2] != "json" {
-                return Err(GenerateError::InvalidFileName(filename.to_owned()));
+                return Err(Error::InvalidFileName(filename.to_owned()));
             }
             Ok(components[0])
         }
 
-        fn check_table_filename(filename: &str) -> Result<&str, GenerateError> {
+        fn check_table_filename(filename: &str) -> Result<&str, Error> {
             let components = filename.split('.').collect::<Vec<_>>();
             if components.len() != 2
                 || components[1] != "ods" {
-                return Err(GenerateError::InvalidFileName(filename.to_owned()));
+                return Err(Error::InvalidFileName(filename.to_owned()));
             }
             Ok(components[0])
         }
@@ -54,7 +58,7 @@ impl EntityDeclaration {
                 let name1 = check_table_filename(table_filename)?;
                 let name2 = check_schema_filename(schema_filename, "table")?;
                 if name1 != name2 {
-                    return Err(GenerateError::InvalidFileName(format!(
+                    return Err(Error::InvalidFileName(format!(
                         "{table_filename}, {schema_filename}"
                     )));
                 }
@@ -94,7 +98,7 @@ impl EntityDeclaration {
 }
 
 impl Generator {
-    pub fn collect(&mut self) -> Result<(), GenerateError> {
+    pub fn collect(&mut self) -> Result<(), Error> {
         println!("Collecting...");
 
         let mut collect_tasks = vec![(
@@ -132,7 +136,7 @@ impl Generator {
         module_entry: &mut ModuleEntry,
         namespaces: &Vec<String>,
         declaration: &EntityDeclaration,
-    ) -> Result<(), GenerateError> {
+    ) -> Result<(), Error> {
         declaration.validate()?;
         let name = declaration.get_name(&namespaces);
 
@@ -215,16 +219,16 @@ impl Generator {
         Ok(())
     }
 
-    fn register_type(&mut self, typename: String) -> Result<(), GenerateError> {
+    fn register_type(&mut self, typename: String) -> Result<(), Error> {
         if self.type_names.contains(&typename) {
-            return Err(GenerateError::NamespaceCollision(typename));
+            return Err(Error::NamespaceCollision(typename));
         }
 
         self.type_names.insert(typename);
         Ok(())
     }
 
-    fn build_dependency_levels(&mut self) -> Result<(), GenerateError> {
+    fn build_dependency_levels(&mut self) -> Result<(), Error> {
         // 1. Build graph
         let mut graph: HashMap<usize, Vec<usize>> = HashMap::new();
         for (index, table) in self.tables.iter().enumerate() {
@@ -239,7 +243,7 @@ impl Generator {
                 let target_index = match self.table_indices.get(link_type) {
                     Some(index) => *index,
                     None => {
-                        return Err(GenerateError::UnknownType(link_type.clone()));
+                        return Err(Error::UnknownType(link_type.clone()));
                     },
                 };
 
@@ -290,7 +294,7 @@ impl Generator {
 
         // Cycle detected
         if sorted_count != graph.len() {
-            return Err(GenerateError::CircularDependency)
+            return Err(Error::CircularDependency)
         }
 
         Ok(())

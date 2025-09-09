@@ -1,9 +1,38 @@
 use std::fs;
 use crate::*;
-use crate::generate::*;
+use crate::generator::*;
+
+#[derive(Debug)]
+pub struct EnumerationEntry {
+    pub name: Name,
+    pub schema: EnumerationSchema
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EnumerationSchema {
+    name: String,
+    base: EnumerationBase,
+    enums: Vec<String>,
+    target: Target,
+    attributes: Vec<EnumerationAttribute>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EnumerationBase {
+    Uint8,
+    Uint16,
+    Uint32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EnumerationAttribute {
+    target: Target,
+    attribute: String,
+}
 
 impl Generator {
-    pub fn generate_enumeration(&self, enumeration: &EnumerationEntry) -> Result<(), GenerateError> {
+    pub fn generate_enumeration(&self, enumeration: &EnumerationEntry) -> Result<(), Error> {
         let enum_dir = self.full_gen_dir(&enumeration.name.namespaces);
         let code = enumeration.generate()?;
 
@@ -17,7 +46,7 @@ impl Generator {
 }
 
 impl EnumerationEntry {
-    pub fn generate(&self) -> Result<String, GenerateError> {
+    pub fn generate(&self) -> Result<String, Error> {
         let mut enums = Vec::new();
         let mut enum_parses = Vec::new();
         let mut enum_intos = Vec::new();
