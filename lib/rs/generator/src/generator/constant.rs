@@ -68,7 +68,7 @@ pub enum ScalarStringType {
 
 impl Generator {
     pub fn generate_constant(&self, constant: &ConstantEntry) -> Result<(), Error> {
-        let const_dir = self.full_gen_dir(&constant.name.namespaces);
+        let const_dir = self.full_gen_dir(&constant.name.namespace);
         let code = constant.generate()?;
 
         fs::write(

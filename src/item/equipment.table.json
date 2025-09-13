@@ -1,0 +1,13 @@
+{
+    "name": "Equipment",
+    "concrete": true,
+    "extend": "item::Item",
+    "fields": [
+        {
+            "name": "kind",
+            "kind": "enum",
+            "type": "item::EquipmentKind",
+            "target": "all"
+        }
+    ]
+}

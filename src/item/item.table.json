@@ -1,6 +1,6 @@
 {
     "name": "Item",
-    "kind": "abstract",
+    "abstract": true,
     "fields": [
         {
             "name": "id",
@@ -9,16 +9,9 @@
             "target": "all"
         },
         {
-            "name": "race",
-            "kind": "enum",
-            "type": "character::Race",
-            "target": "all",
-            "constraints": ["exclusive"]
-        },
-        {
-            "name": "speed",
+            "name": "name",
             "kind": "scalar",
-            "type": "float32",
+            "type": "string",
             "target": "all"
         }
     ]

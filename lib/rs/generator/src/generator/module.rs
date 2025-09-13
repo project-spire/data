@@ -30,10 +30,10 @@ impl Generator {
         &self,
         module: &ModuleEntry
     ) -> Result<(), Error> {
-        let module_dir = self.full_gen_dir(&module.name.namespaces);
+        let module_dir = self.full_gen_dir(&module.name.namespace);
         fs::create_dir_all(&module_dir)?;
 
-        let is_base_module = module.name.as_entity() == "data" && module.name.namespaces.is_empty();
+        let is_base_module = module.name.as_entity() == "data" && module.name.namespace.is_empty();
 
         let (code, module_path) = if is_base_module {
             let code = self.generate_base_module_code(module)?;
@@ -41,7 +41,7 @@ impl Generator {
             (code, module_path)
         } else {
             // Create children directory
-            let mut namespaces = module.name.namespaces.clone();
+            let mut namespaces = module.name.namespace.clone();
             namespaces.push(module.name.as_entity());
 
             let children_dir = self.full_gen_dir(&namespaces);
@@ -113,7 +113,7 @@ r#"{GENERATED_FILE_WARNING}
         _module: &ModuleEntry,
     ) -> Result<String, Error> {
         let mut level_handles = Vec::new();
-        for (level, indices) in self.dependency_levels.iter().enumerate() {
+        for (level, indices) in self.table_link_dependency_levels.iter().enumerate() {
             if indices.is_empty() {
                 continue;
             }
@@ -127,7 +127,7 @@ r#"{GENERATED_FILE_WARNING}
 
                 handles.push(format!(
                     "{TAB}add::<{CRATE_PREFIX}::{}::{}>(&data_dir, \"{}\", \"{}\", &mut {});",
-                    name.namespaces.join("::"),
+                    name.namespace.join("::"),
                     name.as_data_type(),
                     table.table_path.display(),
                     table.schema.sheet,

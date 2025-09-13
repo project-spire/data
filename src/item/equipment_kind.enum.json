@@ -1,0 +1,16 @@
+{
+    "name": "EquipmentKind",
+    "base": "uint8",
+    "enums": [
+        "Weapon",
+        "Helmet",
+        "Armor"
+    ],
+    "target": "all",
+    "attributes": [
+        {
+            "target": "server",
+            "attribute": "#[derive(Debug, PartialEq)]"
+        }
+    ]
+}

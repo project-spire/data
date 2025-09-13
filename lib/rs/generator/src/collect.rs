@@ -1,6 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use glob::glob;
 use serde::Deserialize;
 use crate::*;
 use crate::generator::constant::*;
@@ -8,233 +9,191 @@ use crate::generator::enumeration::*;
 use crate::generator::module::*;
 use crate::generator::table::*;
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum EntityDeclaration {
-    Module {
-        #[serde(rename = "mod")] schema_filename: String
-    },
-    Table {
-        #[serde(rename = "table")] table_filename: String,
-        #[serde(rename = "schema")] schema_filename: String
-    },
-    Enumeration {
-        #[serde(rename = "enum")] schema_filename: String
-    },
-    Constant {
-        #[serde(rename = "const")] schema_filename: String
-    },
-}
-
-impl EntityDeclaration {
-    fn validate(&self) -> Result<(), Error> {
-        fn check_schema_filename<'a>(
-            filename: &'a str,
-            expected_entity: &str
-        ) -> Result<&'a str, Error> {
-            let components = filename.split('.').collect::<Vec<_>>();
-            if components.len() != 3
-                || components[1] != expected_entity
-                || components[2] != "json" {
-                return Err(Error::InvalidFileName(filename.to_owned()));
-            }
-            Ok(components[0])
-        }
-
-        fn check_table_filename(filename: &str) -> Result<&str, Error> {
-            let components = filename.split('.').collect::<Vec<_>>();
-            if components.len() != 2
-                || components[1] != "ods" {
-                return Err(Error::InvalidFileName(filename.to_owned()));
-            }
-            Ok(components[0])
-        }
-
-        match self {
-            EntityDeclaration::Module { schema_filename } => {
-                check_schema_filename(schema_filename, "mod")?;
-            },
-            EntityDeclaration::Table { table_filename, schema_filename } => {
-                let name1 = check_table_filename(table_filename)?;
-                let name2 = check_schema_filename(schema_filename, "table")?;
-                if name1 != name2 {
-                    return Err(Error::InvalidFileName(format!(
-                        "{table_filename}, {schema_filename}"
-                    )));
-                }
-            },
-            EntityDeclaration::Enumeration { schema_filename } => {
-                check_schema_filename(schema_filename, "enum")?;
-            },
-            EntityDeclaration::Constant { schema_filename } => {
-                check_schema_filename(schema_filename, "const")?;
-            },
-        }
-        Ok(())
-    }
-
-    fn get_name(&self, namespaces: &[String]) -> Name {
-        fn extract_name(filename: &str) -> String {
-            let components = filename.split('.').collect::<Vec<_>>();
-            components[0].to_owned()
-        }
-
-        let name = match self {
-            EntityDeclaration::Module { schema_filename } => {
-                extract_name(schema_filename)
-            },
-            EntityDeclaration::Table { table_filename: _, schema_filename } => {
-                extract_name(schema_filename)
-            },
-            EntityDeclaration::Enumeration { schema_filename } => {
-                extract_name(schema_filename)
-            },
-            EntityDeclaration::Constant { schema_filename } => {
-                extract_name(schema_filename)
-            },
-        };
-        Name::new(&name, &namespaces)
-    }
-}
-
 impl Generator {
     pub fn collect(&mut self) -> Result<(), Error> {
         println!("Collecting...");
 
-        let mut collect_tasks = vec![(
-            ModuleEntry::new(Name::new(
-                "data",
-                &Vec::new(),
-            )),
-            self.config.base_module_path.clone(),
-            Vec::new(),
-        )];
+        let base_module = ModuleEntry::new(Name::new("", Vec::new()));
+        let mut next_modules = vec![base_module];
 
-        while let Some((mut module_entry, module_path, namespaces)) = collect_tasks.pop() {
-            println!("cargo:rerun-if-changed={}", module_path.display());
+        while let Some(mut module) = next_modules.pop() {
+            let child_modules = self.collect_entities(&mut module)?;
+            next_modules.extend(child_modules);
 
-            let declarations: Vec<EntityDeclaration> = serde_json::from_str(
-                &fs::read_to_string(&module_path)?
-            )?;
-            for declaration in &declarations {
-                self.do_collect(&mut collect_tasks, &mut module_entry, &namespaces, declaration)?;
+            self.modules.push(module);
+        }
+
+        self.build_table_hierarchies()?;
+        self.build_table_link_dependency_levels()?;
+
+        Ok(())
+    }
+
+    fn collect_entities(
+        &mut self,
+        module: &mut ModuleEntry,
+    ) -> Result<Vec<ModuleEntry>, Error> {
+        let module_dir = module.name.as_full_path(&self.config.data_dir);
+
+        // Collect entities
+        let entity_files: Vec<PathBuf> = glob(module_dir.join("*.json").to_str().unwrap())
+            .unwrap()
+            .filter_map(Result::ok)
+            .collect();
+
+        for entity_file in entity_files {
+            let file_name = entity_file.file_name().unwrap().to_str().unwrap();
+            let components = file_name.split('.').collect::<Vec<_>>();
+
+            if components.len() != 3 {
+                return Err(Error::InvalidFileName(file_name.to_owned()));
             }
 
-            self.modules.push(module_entry);
+            let entity_name = module.name.get_child(components[0]);
+            match components[1] {
+                "table" => {
+                    self.collect_table(module, &entity_file, entity_name)?;
+                },
+                "enum" => {
+                    self.collect_enumeration(module, &entity_file, entity_name)?;
+                },
+                "const" => {
+                    self.collect_constant(module, &entity_file, entity_name)?;
+                },
+                _ => {
+                    return Err(Error::InvalidFileName(file_name.to_owned()));
+                }
+            }
+
+            println!("cargo:rerun-if-changed={}", entity_file.display());
         }
 
-        self.base_module_index = Some(0);
+        // Collect child modules
+        let mut child_modules = Vec::new();
 
-        self.check_dependency_cycle()?;
+        for entry in fs::read_dir(&module_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
 
-        Ok(())
+            let dir_name = path.file_name().unwrap().to_str().unwrap();
+            let module_name = module.name.get_child(dir_name);
+
+            child_modules.push(ModuleEntry::new(module_name));
+        }
+
+        Ok(child_modules)
     }
 
-    fn do_collect(
+    fn collect_table(
         &mut self,
-        collect_tasks: &mut Vec<(ModuleEntry, PathBuf, Vec<String>)>,
-        module_entry: &mut ModuleEntry,
-        namespaces: &Vec<String>,
-        declaration: &EntityDeclaration,
+        module: &mut ModuleEntry,
+        file: &Path,
+        name: Name,
     ) -> Result<(), Error> {
-        declaration.validate()?;
-        let name = declaration.get_name(&namespaces);
+        let type_name = name.as_type(true);
+        self.register_type(&type_name)?;
 
-        match declaration {
-            EntityDeclaration::Module { schema_filename } => {
-                let child_module_path = self.full_data_path(&namespaces, schema_filename);
-                let child_module_entry = ModuleEntry {
-                    name: name.clone(),
-                    entries: Vec::new(),
-                };
+        let schema: TableSchema = serde_json::from_str(&fs::read_to_string(file)?)?;
 
-                let mut namespaces = namespaces.clone();
-                namespaces.push(name.as_entity());
-                collect_tasks.push((child_module_entry, child_module_path, namespaces));
+        self.tables.push(TableEntry { name, schema });
+        module.entries.push(EntityEntry::TableIndex(
+            self.tables.len() - 1
+        ));
 
-                module_entry.entries.push(EntityEntry::ModuleIndex(
-                    self.modules.len() + 1
-                ))
-            },
-            EntityDeclaration::Table { table_filename, schema_filename } => {
-                let type_name = name.as_type(true);
-                self.register_type(type_name.clone())?;
-
-                let schema_full_path = self.full_data_path(&namespaces, schema_filename);
-                println!("cargo:rerun-if-changed={}", schema_full_path.display());
-
-                let schema: TableSchema = serde_json::from_str(
-                    &fs::read_to_string(&schema_full_path)?
-                )?;
-                
-                self.tables.push(TableEntry {
-                    name,
-                    table_path: PathBuf::from(namespaces.join("/")).join(table_filename),
-                    schema,
-                });
-                module_entry.entries.push(EntityEntry::TableIndex(
-                    self.tables.len() - 1
-                ));
-
-                self.table_indices.insert(type_name, self.tables.len() - 1);
-            },
-            EntityDeclaration::Enumeration { schema_filename } => {
-                self.register_type(name.as_type(true))?;
-
-                let schema_full_path = self.full_data_path(&namespaces, schema_filename);
-                println!("cargo:rerun-if-changed={}", schema_full_path.display());
-
-                let schema: EnumerationSchema = serde_json::from_str(
-                    &fs::read_to_string(&schema_full_path)?
-                )?;
-
-                self.enumerations.push(EnumerationEntry {
-                    name,
-                    schema,
-                });
-                module_entry.entries.push(EntityEntry::EnumerationIndex(
-                    self.enumerations.len() - 1
-                ));
-            },
-            EntityDeclaration::Constant { schema_filename } => {
-                self.register_type(name.as_type(true))?;
-
-                let schema_full_path = self.full_data_path(&namespaces, schema_filename);
-                println!("cargo:rerun-if-changed={}", schema_full_path.display());
-
-                let schema: ConstantSchema = serde_json::from_str(
-                    &fs::read_to_string(&schema_full_path)?
-                )?;
-
-                self.constants.push(ConstantEntry {
-                    name,
-                    schema,
-                });
-                module_entry.entries.push(EntityEntry::ConstantIndex(
-                    self.constants.len() - 1
-                ));
-            },
-        }
+        self.table_indices.insert(type_name, self.tables.len() - 1);
 
         Ok(())
     }
 
-    fn register_type(&mut self, typename: String) -> Result<(), Error> {
-        if self.type_names.contains(&typename) {
-            return Err(Error::NamespaceCollision(typename));
-        }
+    fn collect_enumeration(
+        &mut self,
+        module: &mut ModuleEntry,
+        file: &Path,
+        name: Name,
+    ) -> Result<(), Error> {
+        self.register_type(&name.as_type(true))?;
 
-        self.type_names.insert(typename);
+        let schema: EnumerationSchema = serde_json::from_str(&fs::read_to_string(file)?)?;
+
+        self.enumerations.push(EnumerationEntry {
+            name,
+            schema,
+        });
+        module.entries.push(EntityEntry::EnumerationIndex(
+            self.enumerations.len() - 1
+        ));
+
         Ok(())
     }
 
-    fn check_dependency_cycle(&mut self) -> Result<(), Error> {
+    fn collect_constant(
+        &mut self,
+        module: &mut ModuleEntry,
+        file: &Path,
+        name: Name,
+    ) -> Result<(), Error> {
+        self.register_type(&name.as_type(true))?;
+
+        let schema: ConstantSchema = serde_json::from_str(&fs::read_to_string(file)?)?;
+
+        self.constants.push(ConstantEntry {
+            name,
+            schema,
+        });
+        module.entries.push(EntityEntry::ConstantIndex(
+            self.enumerations.len() - 1
+        ));
+
+        Ok(())
+    }
+
+    fn register_type(&mut self, type_name: &str) -> Result<(), Error> {
+        if self.names.contains(type_name) {
+            return Err(Error::NamespaceCollision(type_name.to_owned()));
+        }
+
+        self.names.insert(type_name.to_owned());
+        Ok(())
+    }
+
+    fn build_table_hierarchies(&mut self) -> Result<(), Error> {
+        for (index, _) in self.tables.iter().enumerate() {
+            self.table_hierarchies.insert(index, Vec::new());
+        }
+
+        for (index, table) in self.tables.iter().enumerate() {
+            let extend = match &table.schema {
+                TableSchema::Concrete(schema) => &schema.extend,
+                TableSchema::Abstract(schema) => &schema.extend,
+            };
+            let extend = if let Some(e) = extend {
+                e
+            } else {
+                continue;
+            };
+            
+            self.table_hierarchies.get_mut(&index).unwrap()
+                .push(*self.table_indices.get(extend).unwrap());
+        }
+        
+        Ok(())
+    }
+
+    fn build_table_link_dependency_levels(&mut self) -> Result<(), Error> {
         // 1. Build graph
         let mut graph: HashMap<usize, Vec<usize>> = HashMap::new();
         for (index, table) in self.tables.iter().enumerate() {
             graph.insert(index, Vec::new());
 
-            for field in &table.schema.fields {
+            let fields: &[Field] = match &table.schema {
+                TableSchema::Concrete(schema) => &schema.fields,
+                TableSchema::Abstract(schema) => &schema.fields,
+            };
+
+            for field in fields {
                 let link_type = match &field.kind {
                     FieldKind::Link { link_type } => link_type,
                     _ => continue,
@@ -289,7 +248,7 @@ impl Generator {
                 current_level.push(u);
                 sorted_count += 1;
             }
-            self.dependency_levels.push(current_level);
+            self.table_link_dependency_levels.push(current_level);
         }
 
         // Cycle detected

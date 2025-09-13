@@ -5,11 +5,11 @@ use crate::generator::*;
 #[derive(Debug)]
 pub struct TableEntry {
     pub name: Name,
-    pub table_path: PathBuf,
     pub schema: TableSchema,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(untagged)]
 pub enum TableSchema {
     Concrete(ConcreteTableSchema),
     Abstract(AbstractTableSchema),
@@ -17,24 +17,23 @@ pub enum TableSchema {
 
 #[derive(Debug, Deserialize)]
 pub struct ConcreteTableSchema {
+    #[serde(rename = "concrete")]
+    kind: bool,
+
     pub name: String,
-    pub kind: TableKind,
     pub sheet: String,
+    pub extend: Option<String>,
     pub fields: Vec<Field>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct AbstractTableSchema {
-    pub name: String,
-    pub kind: TableKind,
-    pub fields: Vec<Field>,
-}
+    #[serde(rename = "abstract")]
+    kind: bool,
 
-#[derive(Debug, Deserialize, Copy, Clone)]
-#[serde(rename_all = "lowercase")]
-pub enum TableKind {
-    Concrete,
-    Abstract
+    pub name: String,
+    pub extend: Option<String>,
+    pub fields: Vec<Field>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -85,8 +84,15 @@ impl Generator {
         &self,
         table: &TableEntry
     ) -> Result<(), Error> {
-        let table_dir = self.full_gen_dir(&table.name.namespaces);
-        let code = table.generate()?;
+        let table_dir = self.full_gen_dir(&table.name.namespace);
+        let code = match &table.schema {
+            TableSchema::Concrete(schema) => {
+                self.generate_concrete_table(&table.name, schema)?
+            }
+            TableSchema::Abstract(schema) => {
+                self.generate_abstract_table(&table.name, schema)?
+            }
+        };
 
         fs::write(
             table_dir.join(format!("{}.rs", table.name.as_entity())),
@@ -95,17 +101,13 @@ impl Generator {
 
         Ok(())
     }
-}
+    
+    fn generate_concrete_table(
+        &self,
+        name: &Name,
+        schema: &ConcreteTableSchema,
+    ) -> Result<String, Error> {
 
-impl TableEntry {
-    fn generate(&self) -> Result<String, Error> {
-        match self.schema.kind {
-            TableKind::Concrete => self.generate_concrete(),
-            TableKind::Abstract => self.generate_abstract(),
-        }
-    }
-
-    fn generate_concrete(&self) -> Result<String, Error> {
         // Check fields
         let mut lifetime_code = String::new();
         let mut lifetime_parameter_code = String::new();
@@ -114,7 +116,7 @@ impl TableEntry {
         let mut field_parses = Vec::new();
         let mut field_definitions = Vec::new();
 
-        for (index, field) in self.schema.fields.iter().enumerate() {
+        for (index, field) in schema.fields.iter().enumerate() {
             if let FieldKind::Link { .. } = &field.kind {
                 lifetime_code = "<'a>".to_string();
                 lifetime_parameter_code = "<'_>".to_string();
@@ -130,6 +132,10 @@ impl TableEntry {
         }
 
         // Generate codes
+        let data_cell_name = name.as_data_type_cell();
+        let data_type_name = name.as_data_type();
+        let table_type_name = name.as_type(false);
+        
         let field_definitions_code = field_definitions.join("\n");
         let field_parses_code = field_parses.join("\n");
         let field_passes_code = field_names
@@ -208,15 +214,16 @@ impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_param
         Ok(())
     }}
 }}
-"#,
-            data_cell_name = self.name.as_data_type_cell(),
-            data_type_name = self.name.as_data_type(),
-            table_type_name = self.name.as_type(false),
-        ))
+"#))
     }
 
-    fn generate_abstract(&self) -> Result<String, Error> {
-        todo!()
+    fn generate_abstract_table(
+        &self,
+        name: &Name,
+        schema: &AbstractTableSchema,
+    ) -> Result<String, Error> {
+        
+
     }
 }
 

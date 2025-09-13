@@ -3,6 +3,7 @@ pub(crate) mod enumeration;
 pub(crate) mod module;
 pub(crate) mod table;
 
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use crate::*;
 use self::constant::ConstantEntry;
@@ -14,15 +15,16 @@ use self::table::TableEntry;
 pub struct Generator {
     pub config: Config,
 
-    pub base_module_index: Option<usize>,
+    // pub base_module_index: Option<usize>,
     pub modules: Vec<ModuleEntry>,
     pub tables: Vec<TableEntry>,
     pub enumerations: Vec<EnumerationEntry>,
     pub constants: Vec<ConstantEntry>,
 
-    pub type_names: HashSet<String>,
+    pub names: HashSet<String>,
     pub table_indices: HashMap<String, usize>,
-    pub dependency_levels: Vec<Vec<usize>>,
+    pub table_hierarchies: HashMap<usize, Vec<usize>>,
+    pub table_link_dependency_levels: Vec<Vec<usize>>,
 }
 
 impl Generator {
@@ -30,28 +32,17 @@ impl Generator {
         Self {
             config,
 
-            base_module_index: None,
+            // base_module_index: None,
             modules: Vec::new(),
             tables: Vec::new(),
             enumerations: Vec::new(),
             constants: Vec::new(),
 
-            type_names: HashSet::new(),
+            names: HashSet::new(),
             table_indices: HashMap::new(),
-            dependency_levels: Vec::new(),
+            table_hierarchies: HashMap::new(),
+            table_link_dependency_levels: Vec::new(),
         }
-    }
-
-    pub fn full_data_path(&self, namespaces: &[String], file_name: &str) -> PathBuf {
-        self.config.data_dir.join(namespaces.join(".")).join(file_name)
-    }
-
-    pub fn full_gen_dir(&self, namespaces: &[String]) -> PathBuf {
-        self.config.gen_dir.join(namespaces.join("/"))
-    }
-
-    pub fn full_gen_path(&self, namespaces: &[String], file_name: &str) -> PathBuf {
-        self.full_gen_dir(namespaces).join(file_name)
     }
 
     pub fn generate(&self) -> Result<(), Error> {
@@ -76,5 +67,17 @@ impl Generator {
         }
 
         Ok(())
+    }
+
+    fn full_data_path(&self, namespaces: &[String], file_name: &str) -> PathBuf {
+        self.config.data_dir.join(namespaces.join(".")).join(file_name)
+    }
+
+    fn full_gen_dir(&self, namespaces: &[String]) -> PathBuf {
+        self.config.gen_dir.join(namespaces.join("/"))
+    }
+
+    fn full_gen_path(&self, namespaces: &[String], file_name: &str) -> PathBuf {
+        self.full_gen_dir(namespaces).join(file_name)
     }
 }
