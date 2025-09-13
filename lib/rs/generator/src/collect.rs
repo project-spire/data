@@ -125,7 +125,7 @@ impl Generator {
 
         self.base_module_index = Some(0);
 
-        self.build_dependency_levels()?;
+        self.check_dependency_cycle()?;
 
         Ok(())
     }
@@ -228,7 +228,7 @@ impl Generator {
         Ok(())
     }
 
-    fn build_dependency_levels(&mut self) -> Result<(), Error> {
+    fn check_dependency_cycle(&mut self) -> Result<(), Error> {
         // 1. Build graph
         let mut graph: HashMap<usize, Vec<usize>> = HashMap::new();
         for (index, table) in self.tables.iter().enumerate() {

@@ -10,10 +10,23 @@ pub struct TableEntry {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct TableSchema {
+pub enum TableSchema {
+    Concrete(ConcreteTableSchema),
+    Abstract(AbstractTableSchema),
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ConcreteTableSchema {
     pub name: String,
     pub kind: TableKind,
     pub sheet: String,
+    pub fields: Vec<Field>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AbstractTableSchema {
+    pub name: String,
+    pub kind: TableKind,
     pub fields: Vec<Field>,
 }
 
@@ -211,27 +224,27 @@ impl FieldKind {
     fn to_rust_type(&self) -> String {
         match &self {
             FieldKind::Scalar { scalar_type: t } => match t {
-                ScalarAllType::Id => "DataId".to_string(),
-                ScalarAllType::Bool => "bool".to_string(),
-                ScalarAllType::Int8 => "i8".to_string(),
-                ScalarAllType::Int16 => "i16".to_string(),
-                ScalarAllType::Int32 => "i32".to_string(),
-                ScalarAllType::Int64 => "i64".to_string(),
-                ScalarAllType::Uint8 => "u8".to_string(),
-                ScalarAllType::Uint16 => "u16".to_string(),
-                ScalarAllType::Uint32 => "u32".to_string(),
-                ScalarAllType::Uint64 => "u64".to_string(),
-                ScalarAllType::Float32 => "f32".to_string(),
-                ScalarAllType::Float64 => "f64".to_string(),
-                ScalarAllType::Str => "String".to_string(),
-                ScalarAllType::Datetime => "chrono::DateTime".to_string(),
-                ScalarAllType::Duration => "chrono::Duration".to_string(),
+                ScalarAllType::Id => "DataId",
+                ScalarAllType::Bool => "bool",
+                ScalarAllType::Int8 => "i8",
+                ScalarAllType::Int16 => "i16",
+                ScalarAllType::Int32 => "i32",
+                ScalarAllType::Int64 => "i64",
+                ScalarAllType::Uint8 => "u8",
+                ScalarAllType::Uint16 => "u16",
+                ScalarAllType::Uint32 => "u32",
+                ScalarAllType::Uint64 => "u64",
+                ScalarAllType::Float32 => "f32",
+                ScalarAllType::Float64 => "f64",
+                ScalarAllType::Str => "String",
+                ScalarAllType::Datetime => "chrono::DateTime",
+                ScalarAllType::Duration => "chrono::Duration",
+            }.to_string(),
+            FieldKind::Enum { enum_type } => {
+                format!("{CRATE_PREFIX}::{enum_type}")
             },
-            FieldKind::Enum { enum_type: t } => {
-                format!("{CRATE_PREFIX}::{t}")
-            },
-            FieldKind::Link { link_type: t } => {
-                format!("Link<'a, {CRATE_PREFIX}::{t}>")
+            FieldKind::Link { link_type } => {
+                format!("Link<'a, {CRATE_PREFIX}::{link_type}>")
             },
         }
     }
@@ -255,8 +268,8 @@ impl FieldKind {
                 ScalarAllType::Datetime => "parse_datetime",
                 ScalarAllType::Duration => "parse_duration",
             }),
-            FieldKind::Enum { enum_type: t } => format!("{CRATE_PREFIX}::{t}::parse"),
-            FieldKind::Link { link_type: t } => format!("{CRATE_PREFIX}::parse_link::<{CRATE_PREFIX}::{t}>"),
+            FieldKind::Enum { enum_type } => format!("{CRATE_PREFIX}::{enum_type}::parse"),
+            FieldKind::Link { link_type } => format!("{CRATE_PREFIX}::parse_link::<{CRATE_PREFIX}::{link_type}>"),
         }
     }
 }

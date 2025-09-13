@@ -1,8 +1,6 @@
 {
-    "$schema": "../../schema/table.json",
-    "name": "RaceStat",
-    "kind": "concrete",
-    "sheet": "RaceStat",
+    "name": "Item",
+    "kind": "abstract",
     "fields": [
         {
             "name": "id",
@@ -23,8 +21,5 @@
             "type": "float32",
             "target": "all"
         }
-    ],
-    "indices": [
-        { "index": "race" }
     ]
 }
