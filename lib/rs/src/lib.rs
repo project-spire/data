@@ -1,5 +1,5 @@
-pub mod character;
-pub mod load;
+pub mod data;
+pub use data::*;
 
 use calamine::DataType;
 use std::ops::Deref;

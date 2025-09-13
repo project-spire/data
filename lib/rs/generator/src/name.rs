@@ -22,8 +22,16 @@ impl Name {
         Self::new(child_name, child_namespace)
     }
 
-    pub fn as_full_path(&self, base_dir: &Path) -> PathBuf {
-        base_dir.join(self.namespace.join("/")).join(&self.name)
+    pub fn parent_namespace(&self) -> &[String] {
+        if self.namespace.is_empty() {
+            &self.namespace
+        } else {
+            &self.namespace[..self.namespace.len() - 1]
+        }
+    }
+
+    pub fn as_full_dir(&self, base_dir: &Path) -> PathBuf {
+        base_dir.join(self.namespace.join("/"))
     }
 
     pub fn as_entity(&self) -> String {

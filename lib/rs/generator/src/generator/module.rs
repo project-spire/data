@@ -1,6 +1,7 @@
 use std::fs;
 use crate::*;
 use crate::generator::*;
+use crate::generator::table::TableSchema;
 
 #[derive(Debug)]
 pub struct ModuleEntry {
@@ -30,29 +31,25 @@ impl Generator {
         &self,
         module: &ModuleEntry
     ) -> Result<(), Error> {
-        let module_dir = self.full_gen_dir(&module.name.namespace);
-        fs::create_dir_all(&module_dir)?;
+        let is_base_module = module.name.name.is_empty() && module.name.namespace.is_empty();
 
-        let is_base_module = module.name.as_entity() == "data" && module.name.namespace.is_empty();
-
-        let (code, module_path) = if is_base_module {
-            let code = self.generate_base_module_code(module)?;
-            let module_path = module_dir.join("load.rs");
-            (code, module_path)
+        let module_file = if is_base_module {
+            self.full_gen_dir(&[]).parent().unwrap().join("data.rs")
         } else {
-            // Create children directory
-            let mut namespaces = module.name.namespace.clone();
-            namespaces.push(module.name.as_entity());
+            self.full_gen_dir(&module.name.parent_namespace()).join(format!("{}.rs", module.name.as_entity()))
+        };
+        self.log(&format!("Generating module `{}`", module_file.display()));
 
-            let children_dir = self.full_gen_dir(&namespaces);
-            fs::create_dir_all(&children_dir)?;
-
-            let code = self.generate_module_code(module)?;
-            let module_path = module_dir.join(format!("{}.rs", module.name.as_entity()));
-            (code, module_path)
+        let code = if is_base_module {
+            let mut code = self.generate_module_code(&module)?;
+            code += &self.generate_table_load_code()?;
+            code
+        } else {
+            self.generate_module_code(module)?
         };
 
-        fs::write(module_path, code)?;
+        fs::create_dir_all(self.full_gen_dir(&module.name.namespace))?;
+        fs::write(module_file, code)?;
 
         Ok(())
     }
@@ -71,30 +68,23 @@ impl Generator {
                 let name = &child.name;
 
                 imports.push(format!("pub mod {};", name.as_entity()));
-                exports.push(format!(
-                    "pub use {}::{{{}, {}, {}}};",
-                    name.as_entity(),
-                    name.as_type(false),
-                    name.as_data_type(),
-                    name.as_data_type_cell(),
-                ));
+                exports.push(format!("pub use {}::*;", name.as_entity()));
             },
             EntityEntry::ConstantIndex(index) => {
                 let child = &self.constants[*index];
-                imports.push(format!("pub mod {};", child.name.as_entity()));
+                let name = &child.name;
+
+                imports.push(format!("pub mod {};", name.as_entity()));
+                exports.push(format!("pub use {}::*;", name.as_entity()));
             },
             EntityEntry::EnumerationIndex(index) => {
                 let child = &self.enumerations[*index];
                 let name = &child.name;
 
                 imports.push(format!("pub mod {};", name.as_entity()));
-                exports.push(format!(
-                    "pub use {}::{};",
-                    name.as_entity(),
-                    name.as_type(false),
-                ));
-            }, }
-        }
+                exports.push(format!("pub use {}::*;", name.as_entity()));
+            },
+        } }
 
         let imports_code = imports.join("\n");
         let exports_code = exports.join("\n");
@@ -108,10 +98,7 @@ r#"{GENERATED_FILE_WARNING}
         ))
     }
 
-    fn generate_base_module_code(
-        &self,
-        _module: &ModuleEntry,
-    ) -> Result<String, Error> {
+    fn generate_table_load_code(&self) -> Result<String, Error> {
         let mut level_handles = Vec::new();
         for (level, indices) in self.table_link_dependency_levels.iter().enumerate() {
             if indices.is_empty() {
@@ -125,12 +112,19 @@ r#"{GENERATED_FILE_WARNING}
                 let table = &self.tables[*index];
                 let name = &table.name;
 
+                let (file, sheet) = match &table.schema {
+                    TableSchema::Concrete { data, sheet, .. } => (data, sheet),
+                    TableSchema::Abstract { .. } => continue,
+                };
+
+                let file = name.parent_namespace().join("/") + &format!("/{file}");
+
                 handles.push(format!(
-                    "{TAB}add::<{CRATE_PREFIX}::{}::{}>(&data_dir, \"{}\", \"{}\", &mut {});",
-                    name.namespace.join("::"),
+                    "{TAB}add::<{}::{}>({}, \"{}\", &mut {});",
+                    name.parent_namespace().join("::"),
                     name.as_data_type(),
-                    table.table_path.display(),
-                    table.schema.sheet,
+                    format!("data_dir.join(\"{}\")", file),
+                    sheet,
                     handles_name,
                 ));
             }
@@ -146,23 +140,21 @@ r#"    let mut {handles_name} = Vec::new();
         }
 
         Ok(format!(
-r#"{GENERATED_FILE_WARNING}
+r#"
 use calamine::Reader;
 
 pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), {CRATE_PREFIX}::LoadError> {{
     type HandleType = tokio::task::JoinHandle<Result<(), {CRATE_PREFIX}::LoadError>>;
 
     fn add<T: {CRATE_PREFIX}::Loadable>(
-        data_dir: &std::path::PathBuf,
-        file_path: &str,
+        file: std::path::PathBuf,
         sheet: &str,
         handles: &mut Vec<HandleType>,
     ) {{
-        let file_path = data_dir.join(file_path);
         let sheet = sheet.to_owned();
 
         handles.push(tokio::task::spawn(async move {{
-            let mut workbook: calamine::Ods<_> = calamine::open_workbook(file_path)?;
+            let mut workbook: calamine::Ods<_> = calamine::open_workbook(file)?;
             let sheet = workbook
                 .with_header_row(calamine::HeaderRow::Row({HEADER_ROWS}))
                 .worksheet_range(&sheet)?;

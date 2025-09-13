@@ -4,7 +4,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = generator::Config {
         data_dir: PathBuf::from("../../src"),
         // gen_dir: out_dir.join("gen"),
-        gen_dir: PathBuf::from("src"),
+        gen_dir: PathBuf::from("src/data"),
+        verbose: true,
         dry_run: false,
     };
     config.generate()?;

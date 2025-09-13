@@ -68,16 +68,16 @@ impl Generator {
 
         Ok(())
     }
-
-    fn full_data_path(&self, namespaces: &[String], file_name: &str) -> PathBuf {
-        self.config.data_dir.join(namespaces.join(".")).join(file_name)
+    
+    pub(crate) fn log(&self, message: &str) {
+        if !self.config.verbose {
+            return;
+        }
+        
+        println!("{}", message);
     }
 
     fn full_gen_dir(&self, namespaces: &[String]) -> PathBuf {
         self.config.gen_dir.join(namespaces.join("/"))
-    }
-
-    fn full_gen_path(&self, namespaces: &[String], file_name: &str) -> PathBuf {
-        self.full_gen_dir(namespaces).join(file_name)
     }
 }

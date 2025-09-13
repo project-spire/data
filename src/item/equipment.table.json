@@ -1,7 +1,9 @@
 {
     "name": "Equipment",
-    "concrete": true,
+    "type": "concrete",
     "extend": "item::Item",
+    "data": "equipment.ods",
+    "sheet": "Equipment",
     "fields": [
         {
             "name": "kind",

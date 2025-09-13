@@ -1,7 +1,7 @@
 {
-    "$schema": "../../schema/table.json",
     "name": "RaceStat",
-    "kind": "concrete",
+    "type": "concrete",
+    "data": "race_stat.ods",
     "sheet": "RaceStat",
     "fields": [
         {

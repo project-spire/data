@@ -33,14 +33,14 @@ pub struct EnumerationAttribute {
 
 impl Generator {
     pub fn generate_enumeration(&self, enumeration: &EnumerationEntry) -> Result<(), Error> {
-        let enum_dir = self.full_gen_dir(&enumeration.name.namespace);
+        let enumeration_file = self
+            .full_gen_dir(&enumeration.name.parent_namespace())
+            .join(format!("{}.rs", enumeration.name.as_entity()));
+        self.log(&format!("Generating enumeration `{}`", enumeration_file.display()));
+
         let code = enumeration.generate()?;
 
-        fs::write(
-            enum_dir.join(format!("{}.rs", enumeration.name.as_entity())),
-            code,
-        )?;
-
+        fs::write(enumeration_file, code)?;
         Ok(())
     }
 }

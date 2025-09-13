@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::fs;
 use crate::*;
 use crate::generator::*;
@@ -9,32 +10,51 @@ pub struct TableEntry {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(untagged)]
+#[serde(tag = "type", rename_all = "lowercase")]
 pub enum TableSchema {
-    Concrete(ConcreteTableSchema),
-    Abstract(AbstractTableSchema),
+    Concrete {
+        name: String,
+        data: String,
+        sheet: String,
+        fields: Vec<Field>,
+
+        #[serde(default)]
+        extend: Option<String>,
+    },
+    Abstract {
+        name: String,
+        fields: Vec<Field>,
+
+        #[serde(default)]
+        extend: Option<String>,
+    },
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ConcreteTableSchema {
-    #[serde(rename = "concrete")]
-    kind: bool,
-
-    pub name: String,
-    pub sheet: String,
-    pub extend: Option<String>,
-    pub fields: Vec<Field>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct AbstractTableSchema {
-    #[serde(rename = "abstract")]
-    kind: bool,
-
-    pub name: String,
-    pub extend: Option<String>,
-    pub fields: Vec<Field>,
-}
+// #[derive(Debug, Deserialize)]
+// pub struct ConcreteTableSchema {
+//     #[serde(rename = "concrete")]
+//     _type: bool,
+//
+//     pub name: String,
+//     pub data: String,
+//     pub sheet: String,
+//     pub fields: Vec<Field>,
+//
+//     #[serde(default, skip_serializing_if = "Option::is_none")]
+//     pub extend: Option<String>,
+// }
+//
+// #[derive(Debug, Deserialize)]
+// pub struct AbstractTableSchema {
+//     #[serde(rename = "abstract")]
+//     _type: bool,
+//
+//     pub name: String,
+//     pub fields: Vec<Field>,
+//
+//     #[serde(default)]
+//     pub extend: Option<String>,
+// }
 
 #[derive(Debug, Deserialize)]
 pub struct Field {
@@ -62,7 +82,7 @@ pub enum ScalarAllType {
     Int8, Int16, Int32, Int64,
     Uint8, Uint16, Uint32, Uint64,
     Float32, Float64,
-    Str,
+    String,
     Datetime,
     Duration,
 }
@@ -84,20 +104,21 @@ impl Generator {
         &self,
         table: &TableEntry
     ) -> Result<(), Error> {
-        let table_dir = self.full_gen_dir(&table.name.namespace);
+        let table_file = self
+            .full_gen_dir(&table.name.parent_namespace())
+            .join(format!("{}.rs", table.name.as_entity()));
+        self.log(&format!("Generating table `{}`", table_file.display()));
+
         let code = match &table.schema {
-            TableSchema::Concrete(schema) => {
-                self.generate_concrete_table(&table.name, schema)?
+            TableSchema::Concrete { fields, .. } => {
+                self.generate_concrete_table(&table.name, fields)?
             }
-            TableSchema::Abstract(schema) => {
-                self.generate_abstract_table(&table.name, schema)?
+            TableSchema::Abstract { .. } => {
+                self.generate_abstract_table(&table.name)?
             }
         };
 
-        fs::write(
-            table_dir.join(format!("{}.rs", table.name.as_entity())),
-            code,
-        )?;
+        fs::write(table_file, code)?;
 
         Ok(())
     }
@@ -105,7 +126,7 @@ impl Generator {
     fn generate_concrete_table(
         &self,
         name: &Name,
-        schema: &ConcreteTableSchema,
+        fields: &[Field],
     ) -> Result<String, Error> {
 
         // Check fields
@@ -116,7 +137,7 @@ impl Generator {
         let mut field_parses = Vec::new();
         let mut field_definitions = Vec::new();
 
-        for (index, field) in schema.fields.iter().enumerate() {
+        for (index, field) in fields.iter().enumerate() {
             if let FieldKind::Link { .. } = &field.kind {
                 lifetime_code = "<'a>".to_string();
                 lifetime_parameter_code = "<'_>".to_string();
@@ -147,7 +168,7 @@ impl Generator {
             .join("\n");
 
         Ok(format!(
-            r#"{GENERATED_FILE_WARNING}
+r#"{GENERATED_FILE_WARNING}
 use tracing::info;
 use {CRATE_PREFIX}::DataId;
 
@@ -220,10 +241,11 @@ impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_param
     fn generate_abstract_table(
         &self,
         name: &Name,
-        schema: &AbstractTableSchema,
     ) -> Result<String, Error> {
-        
-
+        Ok(format!(
+r#"{GENERATED_FILE_WARNING}
+"#
+        ))
     }
 }
 
@@ -243,7 +265,7 @@ impl FieldKind {
                 ScalarAllType::Uint64 => "u64",
                 ScalarAllType::Float32 => "f32",
                 ScalarAllType::Float64 => "f64",
-                ScalarAllType::Str => "String",
+                ScalarAllType::String => "String",
                 ScalarAllType::Datetime => "chrono::DateTime",
                 ScalarAllType::Duration => "chrono::Duration",
             }.to_string(),
@@ -271,7 +293,7 @@ impl FieldKind {
                 ScalarAllType::Uint64 => "parse_u64",
                 ScalarAllType::Float32 => "parse_f32",
                 ScalarAllType::Float64 => "parse_f64",
-                ScalarAllType::Str => "parse_str",
+                ScalarAllType::String => "parse_string",
                 ScalarAllType::Datetime => "parse_datetime",
                 ScalarAllType::Duration => "parse_duration",
             }),

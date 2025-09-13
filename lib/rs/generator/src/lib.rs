@@ -18,6 +18,7 @@ const GENERATED_FILE_WARNING: &str = r#"// This is a generated file. DO NOT MODI
 pub struct Config {
     pub data_dir: PathBuf,
     pub gen_dir: PathBuf,
+    pub verbose: bool,
     pub dry_run: bool,
 }
 

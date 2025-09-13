@@ -18,8 +18,12 @@ impl Generator {
 
         while let Some(mut module) = next_modules.pop() {
             let child_modules = self.collect_entities(&mut module)?;
-            next_modules.extend(child_modules);
 
+            for i in 0..child_modules.len() {
+                module.entries.push(EntityEntry::ModuleIndex(self.modules.len() + i + 1));
+            }
+
+            next_modules.extend(child_modules);
             self.modules.push(module);
         }
 
@@ -33,13 +37,15 @@ impl Generator {
         &mut self,
         module: &mut ModuleEntry,
     ) -> Result<Vec<ModuleEntry>, Error> {
-        let module_dir = module.name.as_full_path(&self.config.data_dir);
+        let module_dir = module.name.as_full_dir(&self.config.data_dir);
+        self.log(&format!("Collecting module `{}`", &module_dir.display()));
 
         // Collect entities
         let entity_files: Vec<PathBuf> = glob(module_dir.join("*.json").to_str().unwrap())
             .unwrap()
             .filter_map(Result::ok)
             .collect();
+        self.log(&format!("Found entity files: {:?}", &entity_files));
 
         for entity_file in entity_files {
             let file_name = entity_file.file_name().unwrap().to_str().unwrap();
@@ -81,6 +87,7 @@ impl Generator {
             let dir_name = path.file_name().unwrap().to_str().unwrap();
             let module_name = module.name.get_child(dir_name);
 
+            self.log(&format!("Found child directory `{}`", dir_name));
             child_modules.push(ModuleEntry::new(module_name));
         }
 
@@ -93,6 +100,8 @@ impl Generator {
         file: &Path,
         name: Name,
     ) -> Result<(), Error> {
+        self.log(&format!("Collecting table `{}`", file.display()));
+
         let type_name = name.as_type(true);
         self.register_type(&type_name)?;
 
@@ -114,6 +123,8 @@ impl Generator {
         file: &Path,
         name: Name,
     ) -> Result<(), Error> {
+        self.log(&format!("Collecting enumeration `{}`", file.display()));
+
         self.register_type(&name.as_type(true))?;
 
         let schema: EnumerationSchema = serde_json::from_str(&fs::read_to_string(file)?)?;
@@ -135,6 +146,8 @@ impl Generator {
         file: &Path,
         name: Name,
     ) -> Result<(), Error> {
+        self.log(&format!("Collecting constant `{}`", file.display()));
+
         self.register_type(&name.as_type(true))?;
 
         let schema: ConstantSchema = serde_json::from_str(&fs::read_to_string(file)?)?;
@@ -160,23 +173,21 @@ impl Generator {
     }
 
     fn build_table_hierarchies(&mut self) -> Result<(), Error> {
-        for (index, _) in self.tables.iter().enumerate() {
-            self.table_hierarchies.insert(index, Vec::new());
-        }
-
         for (index, table) in self.tables.iter().enumerate() {
             let extend = match &table.schema {
-                TableSchema::Concrete(schema) => &schema.extend,
-                TableSchema::Abstract(schema) => &schema.extend,
+                TableSchema::Concrete { extend, .. } => extend,
+                TableSchema::Abstract { extend, .. } => extend,
             };
             let extend = if let Some(e) = extend {
                 e
             } else {
                 continue;
             };
-            
-            self.table_hierarchies.get_mut(&index).unwrap()
-                .push(*self.table_indices.get(extend).unwrap());
+
+            self.table_hierarchies
+                .entry(index)
+                .and_modify(|childs| childs.push(*self.table_indices.get(extend).unwrap()))
+                .or_insert(Vec::new());
         }
         
         Ok(())
@@ -189,8 +200,8 @@ impl Generator {
             graph.insert(index, Vec::new());
 
             let fields: &[Field] = match &table.schema {
-                TableSchema::Concrete(schema) => &schema.fields,
-                TableSchema::Abstract(schema) => &schema.fields,
+                TableSchema::Concrete { fields, .. } => fields,
+                TableSchema::Abstract { fields, .. }=> fields,
             };
 
             for field in fields {

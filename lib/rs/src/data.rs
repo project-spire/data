@@ -1,20 +1,23 @@
 // This is a generated file. DO NOT MODIFY.
+pub mod character;
+pub mod item;
+
+
+
 use calamine::Reader;
 
 pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), crate::LoadError> {
     type HandleType = tokio::task::JoinHandle<Result<(), crate::LoadError>>;
 
     fn add<T: crate::Loadable>(
-        data_dir: &std::path::PathBuf,
-        file_path: &str,
+        file: std::path::PathBuf,
         sheet: &str,
         handles: &mut Vec<HandleType>,
     ) {
-        let file_path = data_dir.join(file_path);
         let sheet = sheet.to_owned();
 
         handles.push(tokio::task::spawn(async move {
-            let mut workbook: calamine::Ods<_> = calamine::open_workbook(file_path)?;
+            let mut workbook: calamine::Ods<_> = calamine::open_workbook(file)?;
             let sheet = workbook
                 .with_header_row(calamine::HeaderRow::Row(1))
                 .worksheet_range(&sheet)?;
@@ -36,7 +39,8 @@ pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), crate::LoadEr
     }
 
     let mut level_0_handles = Vec::new();
-    add::<crate::character::RaceStatData>(&data_dir, "character/race_stat.ods", "RaceStat", &mut level_0_handles);
+    add::<character::RaceStatData>(data_dir.join("character/race_stat.ods"), "RaceStat", &mut level_0_handles);
+    add::<item::EquipmentData>(data_dir.join("item/equipment.ods"), "Equipment", &mut level_0_handles);
 
     join(level_0_handles).await?;
 
