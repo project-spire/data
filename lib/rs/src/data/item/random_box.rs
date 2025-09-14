@@ -2,16 +2,16 @@
 use tracing::info;
 use crate::{DataId, error::Error};
 
-pub static EQUIPMENT_DATA: tokio::sync::OnceCell<EquipmentData> = tokio::sync::OnceCell::const_new();
+pub static RANDOM_BOX_DATA: tokio::sync::OnceCell<RandomBoxData> = tokio::sync::OnceCell::const_new();
 
 #[derive(Debug)]
-pub struct Equipment {
+pub struct RandomBox {
     pub id: DataId,
     pub name: String,
-    pub kind: crate::item::EquipmentKind,
+    pub items: (crate::Link<'static, crate::item::Item>, u16),
 }
 
-impl Equipment {
+impl RandomBox {
     fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), Error> {
         const FIELDS_COUNT: usize = 3;
 
@@ -21,45 +21,45 @@ impl Equipment {
 
         let id = crate::parse_id(&row[0])?;
         let name = crate::parse_string(&row[1])?;
-        let kind = crate::item::EquipmentKind::parse(&row[2])?;
+        let items = crate::parse_tuple_2::<crate::Link<'static, crate::item::Item>, u16>(&row[2])?;
 
         Ok((id, Self {
             id,
             name,
-            kind,
+            items,
         }))
     }
 }
 
-impl crate::Linkable for Equipment {
+impl crate::Linkable for RandomBox {
     fn get(id: DataId) -> Option<&'static Self> {
-        EquipmentData::get(id)
+        RandomBoxData::get(id)
     }
 }
 
-pub struct EquipmentData {
-    data: std::collections::HashMap<DataId, Equipment>,
+pub struct RandomBoxData {
+    data: std::collections::HashMap<DataId, RandomBox>,
 }
 
-impl EquipmentData {
-    pub fn get(id: DataId) -> Option<&'static Equipment> {
-        EQUIPMENT_DATA
+impl RandomBoxData {
+    pub fn get(id: DataId) -> Option<&'static RandomBox> {
+        RANDOM_BOX_DATA
             .get()
-            .expect("EQUIPMENT_DATA is not initialized yet")
+            .expect("RANDOM_BOX_DATA is not initialized yet")
             .data
             .get(&id)
     }
 }
 
-impl crate::Loadable for EquipmentData {
+impl crate::Loadable for RandomBoxData {
     fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {
         let mut objects = std::collections::HashMap::new();
         for row in rows {
-            let (id, object) = Equipment::parse(row)?;
+            let (id, object) = RandomBox::parse(row)?;
 
             if objects.contains_key(&id) {
                 return Err(Error::DuplicatedId {
-                    type_name: std::any::type_name::<Equipment>(),
+                    type_name: std::any::type_name::<RandomBox>(),
                     id,
                 });
             }
@@ -67,9 +67,9 @@ impl crate::Loadable for EquipmentData {
             objects.insert(id, object);
         }
 
-        if !EQUIPMENT_DATA.set(Self { data: objects }).is_ok() {
+        if !RANDOM_BOX_DATA.set(Self { data: objects }).is_ok() {
             return Err(Error::AlreadyLoaded {
-                type_name: std::any::type_name::<Equipment>(),
+                type_name: std::any::type_name::<RandomBox>(),
             });
         }
 

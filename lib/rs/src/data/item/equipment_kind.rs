@@ -1,4 +1,6 @@
 // This is a generated file. DO NOT MODIFY.
+use crate::error::Error;
+
 #[derive(Debug, PartialEq)]
 pub enum EquipmentKind {
     Weapon,
@@ -7,14 +9,14 @@ pub enum EquipmentKind {
 }
 
 impl EquipmentKind {
-    pub fn parse(value: &calamine::Data) -> Result<Self, crate::LoadError> {
+    pub fn parse(value: &calamine::Data) -> Result<Self, Error> {
         let enum_string = crate::parse_string(value)?;
 
         Ok(match enum_string.as_str() {
             "Weapon" => Self::Weapon,
             "Helmet" => Self::Helmet,
             "Armor" => Self::Armor,
-            _ => return Err(crate::LoadError::Parse(format!(
+            _ => return Err(Error::Parse(format!(
                 "Invalid value \"{enum_string}\" for EquipmentKind"
             ))),
         })

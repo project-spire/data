@@ -1,0 +1,26 @@
+{
+    "name": "RandomBox",
+    "type": "concrete",
+    "extend": "item::Item",
+    "data": "random_box.ods",
+    "sheet": "RandomBox",
+    "fields": [
+        {
+            "name": "items",
+            "target": "all",
+            "kind": "tuple",
+            "types": [
+                {
+                    "kind": "link",
+                    "type": "item::Item"
+                },
+                {
+                    "kind": "scalar",
+                    "type": "uint16"
+                }
+            ],
+            "cardinality": "multi"
+        }
+    ],
+    "types": []
+}

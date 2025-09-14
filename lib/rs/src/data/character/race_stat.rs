@@ -1,6 +1,6 @@
 // This is a generated file. DO NOT MODIFY.
 use tracing::info;
-use crate::DataId;
+use crate::{DataId, error::Error};
 
 pub static RACE_STAT_DATA: tokio::sync::OnceCell<RaceStatData> = tokio::sync::OnceCell::const_new();
 
@@ -12,7 +12,13 @@ pub struct RaceStat {
 }
 
 impl RaceStat {
-    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), crate::LoadError> {
+    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), Error> {
+        const FIELDS_COUNT: usize = 3;
+
+        if row.len() != FIELDS_COUNT {
+            return Err(Error::OutOfRange { expected: FIELDS_COUNT, actual: row.len() });
+        }
+
         let id = crate::parse_id(&row[0])?;
         let race = crate::character::Race::parse(&row[1])?;
         let speed = crate::parse_f32(&row[2])?;
@@ -46,13 +52,13 @@ impl RaceStatData {
 }
 
 impl crate::Loadable for RaceStatData {
-    fn load(rows: &[&[calamine::Data]]) -> Result<(), crate::LoadError> {
+    fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {
         let mut objects = std::collections::HashMap::new();
         for row in rows {
             let (id, object) = RaceStat::parse(row)?;
 
             if objects.contains_key(&id) {
-                return Err(crate::LoadError::DuplicatedId {
+                return Err(Error::DuplicatedId {
                     type_name: std::any::type_name::<RaceStat>(),
                     id,
                 });
@@ -62,7 +68,7 @@ impl crate::Loadable for RaceStatData {
         }
 
         if !RACE_STAT_DATA.set(Self { data: objects }).is_ok() {
-            return Err(crate::LoadError::AlreadyLoaded {
+            return Err(Error::AlreadyLoaded {
                 type_name: std::any::type_name::<RaceStat>(),
             });
         }

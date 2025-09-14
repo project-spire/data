@@ -79,18 +79,20 @@ impl EnumerationEntry {
 
         Ok(format!(
             r#"{GENERATED_FILE_WARNING}
+use crate::error::Error;
+
 {attributes_code}
 pub enum {enum_type_name} {{
 {enums_code}
 }}
 
 impl {enum_type_name} {{
-    pub fn parse(value: &calamine::Data) -> Result<Self, {CRATE_PREFIX}::LoadError> {{
+    pub fn parse(value: &calamine::Data) -> Result<Self, Error> {{
         let enum_string = {CRATE_PREFIX}::parse_string(value)?;
 
         Ok(match enum_string.as_str() {{
 {enum_parses_code}
-            _ => return Err({CRATE_PREFIX}::LoadError::Parse(format!(
+            _ => return Err(Error::Parse(format!(
                 "Invalid value \"{{enum_string}}\" for {enum_type_name}"
             ))),
         }})

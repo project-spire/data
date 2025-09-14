@@ -3,6 +3,8 @@ use std::fs;
 use crate::*;
 use crate::generator::*;
 
+const TUPLE_TYPES_MAX_COUNT: usize = 4;
+
 #[derive(Debug)]
 pub struct TableEntry {
     pub name: Name,
@@ -51,9 +53,18 @@ pub struct Field {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum FieldKind {
-    Scalar { #[serde(rename = "type")] scalar_type: ScalarAllType },
-    Enum { #[serde(rename = "type")] enum_type: String },
-    Link { #[serde(rename = "type")] link_type: String }
+    Scalar {
+        #[serde(rename = "type")] scalar_type: ScalarAllType
+    },
+    Enum {
+        #[serde(rename = "type")] enum_type: String
+    },
+    Link {
+        #[serde(rename = "type")] link_type: String
+    },
+    Tuple {
+        types: Vec<FieldKind>,
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -70,14 +81,16 @@ pub enum ScalarAllType {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Cardinality {
     Single,
     Multi
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Constraint {
-    #[serde(rename = "exclusive")] Exclusive
+    Exclusive
 }
 
 
@@ -139,6 +152,8 @@ impl Generator {
             lifetime_parameter_code = "<'_>".to_string();
         }
 
+        let fields_count = fields.len();
+
         // Generate codes
         let data_cell_name = name.as_data_type_cell();
         let data_type_name = name.as_data_type();
@@ -157,7 +172,7 @@ impl Generator {
         Ok(format!(
 r#"{GENERATED_FILE_WARNING}
 use tracing::info;
-use {CRATE_PREFIX}::DataId;
+use {CRATE_PREFIX}::{{DataId, error::Error}};
 
 pub static {data_cell_name}: tokio::sync::OnceCell<{data_type_name}> = tokio::sync::OnceCell::const_new();
 
@@ -167,7 +182,13 @@ pub struct {table_type_name}{lifetime_code} {{
 }}
 
 impl {table_type_name}{lifetime_code} {{
-    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), {CRATE_PREFIX}::LoadError> {{
+    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), Error> {{
+        const FIELDS_COUNT: usize = {fields_count};
+
+        if row.len() != FIELDS_COUNT {{
+            return Err(Error::OutOfRange {{ expected: FIELDS_COUNT, actual: row.len() }});
+        }}
+
 {field_parses_code}
 
         Ok((id, Self {{
@@ -197,13 +218,13 @@ impl{lifetime_code} {data_type_name}{lifetime_parameter_code} {{
 }}
 
 impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_parameter_code} {{
-    fn load(rows: &[&[calamine::Data]]) -> Result<(), {CRATE_PREFIX}::LoadError> {{
+    fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {{
         let mut objects = std::collections::HashMap::new();
         for row in rows {{
             let (id, object) = {table_type_name}::parse(row)?;
 
             if objects.contains_key(&id) {{
-                return Err({CRATE_PREFIX}::LoadError::DuplicatedId {{
+                return Err(Error::DuplicatedId {{
                     type_name: std::any::type_name::<{table_type_name}>(),
                     id,
                 }});
@@ -213,7 +234,7 @@ impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_param
         }}
 
         if !{data_cell_name}.set(Self {{ data: objects }}).is_ok() {{
-            return Err({CRATE_PREFIX}::LoadError::AlreadyLoaded {{
+            return Err(Error::AlreadyLoaded {{
                 type_name: std::any::type_name::<{table_type_name}>(),
             }});
         }}
@@ -304,7 +325,11 @@ impl FieldKind {
                 format!("{CRATE_PREFIX}::{enum_type}")
             },
             FieldKind::Link { link_type } => {
-                format!("Link<'a, {CRATE_PREFIX}::{link_type}>")
+                format!("crate::Link<'static, {CRATE_PREFIX}::{link_type}>")
+            },
+            FieldKind::Tuple { types } => {
+                let type_strings = to_tuple_type_strings(types);
+                format!("({})", type_strings.join(", "))
             },
         }
     }
@@ -330,6 +355,34 @@ impl FieldKind {
             }),
             FieldKind::Enum { enum_type } => format!("{CRATE_PREFIX}::{enum_type}::parse"),
             FieldKind::Link { link_type } => format!("{CRATE_PREFIX}::parse_link::<{CRATE_PREFIX}::{link_type}>"),
+            FieldKind::Tuple { types } => {
+                let type_strings = to_tuple_type_strings(types);
+                format!(
+                    "{CRATE_PREFIX}::parse_tuple_{}::<{}>",
+                    type_strings.len(),
+                    type_strings.join(", ")
+                )
+            },
         }
     }
+}
+
+fn to_tuple_type_strings(fields: &[FieldKind]) -> Vec<String> {
+    let mut type_strings = Vec::new();
+    for t in fields {
+        if let FieldKind::Tuple { .. } = t {
+            panic!("Nested tuples are not supported");
+        }
+
+        type_strings.push(t.to_rust_type())
+    }
+
+    if type_strings.len() < 2 {
+        panic!("Tuples must have at least two fields");
+    }
+    if type_strings.len() > TUPLE_TYPES_MAX_COUNT {
+        panic!("Tuples with more than {} types are not supported", TUPLE_TYPES_MAX_COUNT);
+    }
+
+    type_strings
 }

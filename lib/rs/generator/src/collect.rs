@@ -36,7 +36,7 @@ impl Generator {
         &mut self,
         module: &mut ModuleEntry,
     ) -> Result<Vec<ModuleEntry>, Error> {
-        let module_dir = module.name.as_full_dir(&self.config.data_dir);
+        let module_dir = module.name.as_full_dir(&self.config.schema_dir);
         self.log(&format!("Collecting module `{}`", &module_dir.display()));
 
         // Collect entities

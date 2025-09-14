@@ -3,7 +3,7 @@ mod generator;
 mod error;
 mod name;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use crate::name::Name;
 use crate::error::Error;
@@ -16,7 +16,8 @@ const GENERATED_FILE_WARNING: &str = r#"// This is a generated file. DO NOT MODI
 
 #[derive(Debug)]
 pub struct Config {
-    pub data_dir: PathBuf,
+    pub schema_dir: PathBuf,
+    pub src_dir: PathBuf,
     pub gen_dir: PathBuf,
     pub verbose: bool,
     pub dry_run: bool,

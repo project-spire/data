@@ -1,4 +1,6 @@
 // This is a generated file. DO NOT MODIFY.
+use crate::error::Error;
+
 #[derive(Debug, Clone, Copy, PartialEq, sqlx::Type)]
 #[sqlx(type_name = "race")]
 pub enum Race {
@@ -8,14 +10,14 @@ pub enum Race {
 }
 
 impl Race {
-    pub fn parse(value: &calamine::Data) -> Result<Self, crate::LoadError> {
+    pub fn parse(value: &calamine::Data) -> Result<Self, Error> {
         let enum_string = crate::parse_string(value)?;
 
         Ok(match enum_string.as_str() {
             "None" => Self::None,
             "Human" => Self::Human,
             "Orc" => Self::Orc,
-            _ => return Err(crate::LoadError::Parse(format!(
+            _ => return Err(Error::Parse(format!(
                 "Invalid value \"{enum_string}\" for Race"
             ))),
         })

@@ -143,9 +143,10 @@ r#"    let mut {handles_name} = Vec::new();
         Ok(format!(
 r#"
 use calamine::Reader;
+use crate::error::Error;
 
-pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), {CRATE_PREFIX}::LoadError> {{
-    type HandleType = tokio::task::JoinHandle<Result<(), {CRATE_PREFIX}::LoadError>>;
+pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), Error> {{
+    type HandleType = tokio::task::JoinHandle<Result<(), Error>>;
 
     fn add<T: {CRATE_PREFIX}::Loadable>(
         file: std::path::PathBuf,
@@ -165,7 +166,7 @@ pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), {CRATE_PREFIX
         }}));
     }}
 
-    async fn join(handles: Vec<HandleType>) -> Result<(), {CRATE_PREFIX}::LoadError> {{
+    async fn join(handles: Vec<HandleType>) -> Result<(), Error> {{
         for handle in handles {{
             match handle.await {{
                 Ok(result) => result?,

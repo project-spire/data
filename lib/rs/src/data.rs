@@ -5,9 +5,10 @@ pub mod item;
 
 
 use calamine::Reader;
+use crate::error::Error;
 
-pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), crate::LoadError> {
-    type HandleType = tokio::task::JoinHandle<Result<(), crate::LoadError>>;
+pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), Error> {
+    type HandleType = tokio::task::JoinHandle<Result<(), Error>>;
 
     fn add<T: crate::Loadable>(
         file: std::path::PathBuf,
@@ -27,7 +28,7 @@ pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), crate::LoadEr
         }));
     }
 
-    async fn join(handles: Vec<HandleType>) -> Result<(), crate::LoadError> {
+    async fn join(handles: Vec<HandleType>) -> Result<(), Error> {
         for handle in handles {
             match handle.await {
                 Ok(result) => result?,
@@ -39,8 +40,9 @@ pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), crate::LoadEr
     }
 
     let mut level_0_handles = Vec::new();
-    add::<character::RaceStatData>(data_dir.join("character/race_stat.ods"), "RaceStat", &mut level_0_handles);
     add::<item::EquipmentData>(data_dir.join("item/equipment.ods"), "Equipment", &mut level_0_handles);
+    add::<character::RaceStatData>(data_dir.join("character/race_stat.ods"), "RaceStat", &mut level_0_handles);
+    add::<item::RandomBoxData>(data_dir.join("item/random_box.ods"), "RandomBox", &mut level_0_handles);
 
     join(level_0_handles).await?;
 
