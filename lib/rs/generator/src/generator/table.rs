@@ -337,6 +337,11 @@ impl {data_type_name} {{
         let data = unsafe {{ &{data_cell_name}.get().unwrap().data }};
         data.iter()
     }}
+    
+    pub(crate) fn init() {{
+        let data = HashMap::new();
+        unsafe {{ {data_cell_name}.set(Self {{ data }}).unwrap(); }}
+    }}
 
     pub(crate) fn insert(id: &DataId, row: {table_type_name}) -> Result<(), Error> {{
         let data = unsafe {{ &mut {data_cell_name}.get_mut().unwrap().data }};
@@ -347,15 +352,6 @@ impl {data_type_name} {{
             }});
         }}
         data.insert(*id, row);{parent_insert_code}
-
-        Ok(())
-    }}
-}}
-
-impl {CRATE_PREFIX}::Loadable for {data_type_name} {{
-    fn load(_: &[&[calamine::Data]]) -> Result<(), Error> {{
-        let data = HashMap::new();
-        unsafe {{ {data_cell_name}.set(Self {{ data }}).unwrap(); }}
 
         Ok(())
     }}

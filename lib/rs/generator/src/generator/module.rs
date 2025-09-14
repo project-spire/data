@@ -99,6 +99,19 @@ r#"{GENERATED_FILE_WARNING}
     }
 
     fn generate_table_load_code(&self) -> Result<String, Error> {
+        let mut abstract_table_loads = Vec::new();
+        for table in &self.tables {
+            match &table.schema {
+                TableSchema::Concrete(_) => continue,
+                TableSchema::Abstract(_) => {},
+            }
+            let table_name = table.name.as_type(true);
+
+            abstract_table_loads.push(format!(
+                "{TAB}{table_name}Data::init();"
+            ));
+        }
+
         let mut level_handles = Vec::new();
         for (level, indices) in self.table_link_dependency_levels.iter().enumerate() {
             if indices.is_empty() {
@@ -177,11 +190,14 @@ pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), Error> {{
         Ok(())
     }}
 
+{abstract_table_loads_code}
+
 {level_handles_code}
 
     Ok(())
 }}
 "#,
+            abstract_table_loads_code = abstract_table_loads.join("\n"),
             level_handles_code = level_handles.join("\n"),
         ))
     }

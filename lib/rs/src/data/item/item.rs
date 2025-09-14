@@ -42,6 +42,11 @@ impl ItemData {
         let data = unsafe { &ITEM_DATA.get().unwrap().data };
         data.iter()
     }
+    
+    pub(crate) fn init() {
+        let data = HashMap::new();
+        unsafe { ITEM_DATA.set(Self { data }).unwrap(); }
+    }
 
     pub(crate) fn insert(id: &DataId, row: Item) -> Result<(), Error> {
         let data = unsafe { &mut ITEM_DATA.get_mut().unwrap().data };
@@ -52,15 +57,6 @@ impl ItemData {
             });
         }
         data.insert(*id, row);
-
-        Ok(())
-    }
-}
-
-impl crate::Loadable for ItemData {
-    fn load(_: &[&[calamine::Data]]) -> Result<(), Error> {
-        let data = HashMap::new();
-        unsafe { ITEM_DATA.set(Self { data }).unwrap(); }
 
         Ok(())
     }
