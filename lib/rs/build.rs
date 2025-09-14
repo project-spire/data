@@ -1,6 +1,7 @@
 use std::path::PathBuf;
+use std::process::exit;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     let config = generator::Config {
         data_dir: PathBuf::from("../../src"),
         // gen_dir: out_dir.join("gen"),
@@ -8,7 +9,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         verbose: true,
         dry_run: false,
     };
-    config.generate()?;
 
-    Ok(())
+    if let Err(e) = config.generate() {
+        eprintln!("Failed to generate: {}", e);
+        exit(1);
+    }
 }

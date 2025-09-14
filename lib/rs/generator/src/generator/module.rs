@@ -112,19 +112,20 @@ r#"{GENERATED_FILE_WARNING}
                 let table = &self.tables[*index];
                 let name = &table.name;
 
-                let (file, sheet) = match &table.schema {
-                    TableSchema::Concrete { data, sheet, .. } => (data, sheet),
-                    TableSchema::Abstract { .. } => continue,
+                let schema = match &table.schema {
+                    TableSchema::Concrete(schema) => schema,
+                    TableSchema::Abstract(_) => continue,
                 };
 
-                let file = name.parent_namespace().join("/") + &format!("/{file}");
+                let file = name.parent_namespace().join("/")
+                    + &format!("/{}", schema.data);
 
                 handles.push(format!(
                     "{TAB}add::<{}::{}>({}, \"{}\", &mut {});",
                     name.parent_namespace().join("::"),
                     name.as_data_type(),
                     format!("data_dir.join(\"{}\")", file),
-                    sheet,
+                    schema.sheet,
                     handles_name,
                 ));
             }

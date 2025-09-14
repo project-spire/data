@@ -6,14 +6,20 @@ pub static EQUIPMENT_DATA: tokio::sync::OnceCell<EquipmentData> = tokio::sync::O
 
 #[derive(Debug)]
 pub struct Equipment {
+    pub id: DataId,
+    pub name: String,
     pub kind: crate::item::EquipmentKind,
 }
 
 impl Equipment {
     fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), crate::LoadError> {
-        let kind = crate::item::EquipmentKind::parse(&row[0])?;
+        let id = crate::parse_id(&row[0])?;
+        let name = crate::parse_string(&row[1])?;
+        let kind = crate::item::EquipmentKind::parse(&row[2])?;
 
         Ok((id, Self {
+            id,
+            name,
             kind,
         }))
     }

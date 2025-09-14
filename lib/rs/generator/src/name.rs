@@ -42,7 +42,7 @@ impl Name {
         if with_namespace && !self.namespace.is_empty() {
             format!(
                 "{}::{}",
-                self.namespace.join("::"),
+                self.parent_namespace().join("::"),
                 self.name.to_upper_camel_case(),
             )
         } else {

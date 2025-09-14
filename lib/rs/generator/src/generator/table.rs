@@ -1,4 +1,4 @@
-use std::fmt::format;
+use std::collections::VecDeque;
 use std::fs;
 use crate::*;
 use crate::generator::*;
@@ -12,51 +12,33 @@ pub struct TableEntry {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum TableSchema {
-    Concrete {
-        name: String,
-        data: String,
-        sheet: String,
-        fields: Vec<Field>,
-
-        #[serde(default)]
-        extend: Option<String>,
-    },
-    Abstract {
-        name: String,
-        fields: Vec<Field>,
-
-        #[serde(default)]
-        extend: Option<String>,
-    },
+    Concrete(ConcreteTableSchema),
+    Abstract(AbstractTableSchema),
 }
 
-// #[derive(Debug, Deserialize)]
-// pub struct ConcreteTableSchema {
-//     #[serde(rename = "concrete")]
-//     _type: bool,
-//
-//     pub name: String,
-//     pub data: String,
-//     pub sheet: String,
-//     pub fields: Vec<Field>,
-//
-//     #[serde(default, skip_serializing_if = "Option::is_none")]
-//     pub extend: Option<String>,
-// }
-//
-// #[derive(Debug, Deserialize)]
-// pub struct AbstractTableSchema {
-//     #[serde(rename = "abstract")]
-//     _type: bool,
-//
-//     pub name: String,
-//     pub fields: Vec<Field>,
-//
-//     #[serde(default)]
-//     pub extend: Option<String>,
-// }
+#[derive(Debug, Deserialize)]
+pub struct ConcreteTableSchema {
+    pub name: String,
+    pub data: String,
+    pub sheet: String,
+    pub fields: Vec<Field>,
+    pub extend: Option<String>,
+}
 
 #[derive(Debug, Deserialize)]
+pub struct AbstractTableSchema {
+    pub name: String,
+    pub fields: Vec<Field>,
+    pub extend: Option<String>,
+}
+
+pub trait TableSchematic {
+    fn name(&self) -> &str;
+    fn fields(&self) -> &Vec<Field>;
+    fn extend(&self) -> &Option<String>;
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct Field {
     pub name: String,
     #[serde(flatten)] pub kind: FieldKind,
@@ -66,7 +48,7 @@ pub struct Field {
     #[serde(default)] pub constraints: Option<Vec<Constraint>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum FieldKind {
     Scalar { #[serde(rename = "type")] scalar_type: ScalarAllType },
@@ -74,7 +56,7 @@ pub enum FieldKind {
     Link { #[serde(rename = "type")] link_type: String }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ScalarAllType {
     Id,
@@ -87,13 +69,13 @@ pub enum ScalarAllType {
     Duration,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Cardinality {
     Single,
     Multi
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Constraint {
     #[serde(rename = "exclusive")] Exclusive
 }
@@ -110,11 +92,11 @@ impl Generator {
         self.log(&format!("Generating table `{}`", table_file.display()));
 
         let code = match &table.schema {
-            TableSchema::Concrete { fields, .. } => {
-                self.generate_concrete_table(&table.name, fields)?
+            TableSchema::Concrete(schema) => {
+                self.generate_concrete_table(&table.name, schema)?
             }
-            TableSchema::Abstract { .. } => {
-                self.generate_abstract_table(&table.name)?
+            TableSchema::Abstract(schema) => {
+                self.generate_abstract_table(&table.name, schema)?
             }
         };
 
@@ -126,10 +108,10 @@ impl Generator {
     fn generate_concrete_table(
         &self,
         name: &Name,
-        fields: &[Field],
+        schema: &ConcreteTableSchema,
     ) -> Result<String, Error> {
-
-        // Check fields
+        // Prepare field codes
+        let mut has_lifetime = false;
         let mut lifetime_code = String::new();
         let mut lifetime_parameter_code = String::new();
 
@@ -137,10 +119,10 @@ impl Generator {
         let mut field_parses = Vec::new();
         let mut field_definitions = Vec::new();
 
+        let fields = self.get_table_all_fields(schema)?;
         for (index, field) in fields.iter().enumerate() {
             if let FieldKind::Link { .. } = &field.kind {
-                lifetime_code = "<'a>".to_string();
-                lifetime_parameter_code = "<'_>".to_string();
+                has_lifetime = true;
             }
 
             field_names.push(field.name.clone());
@@ -150,6 +132,11 @@ impl Generator {
                 field_name = field.name,
                 parse_function = field.kind.to_parse_code(),
             ));
+        }
+
+        if has_lifetime {
+            lifetime_code = "<'a>".to_string();
+            lifetime_parameter_code = "<'_>".to_string();
         }
 
         // Generate codes
@@ -241,12 +228,56 @@ impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_param
     fn generate_abstract_table(
         &self,
         name: &Name,
+        schema: &AbstractTableSchema,
     ) -> Result<String, Error> {
         Ok(format!(
 r#"{GENERATED_FILE_WARNING}
 "#
         ))
     }
+
+    /// Get all fields of table including its parents
+    pub fn get_table_all_fields(&self, schema: &dyn TableSchematic) -> Result<Vec<Field>, Error> {
+        let mut fields = VecDeque::from(schema.fields().clone());
+        let mut extend = schema.extend().clone();
+
+        while let Some(parent) = extend.take() {
+            let parent_index = self.table_indices
+                .get(&parent)
+                .ok_or_else(|| Error::Inheritance(schema.name().to_owned(), parent))?;
+            let parent_table = &self.tables[*parent_index];
+            let parent_schema = parent_table.schema.schematic();
+
+            for field in parent_schema.fields().iter().rev() {
+                fields.push_front(field.clone());
+            }
+
+            extend = parent_schema.extend().clone();
+        }
+
+        Ok(Vec::from(fields))
+    }
+}
+
+impl TableSchema {
+    pub fn schematic(&self) -> &dyn TableSchematic {
+        match self {
+            TableSchema::Concrete(c) => c,
+            TableSchema::Abstract(a) => a,
+        }
+    }
+}
+
+impl TableSchematic for ConcreteTableSchema {
+    fn name(&self) -> &str { &self.name }
+    fn fields(&self) -> &Vec<Field> { &self.fields }
+    fn extend(&self) -> &Option<String> { &self.extend }
+}
+
+impl TableSchematic for AbstractTableSchema {
+    fn name(&self) -> &str { &self.name }
+    fn fields(&self) -> &Vec<Field> { &self.fields }
+    fn extend(&self) -> &Option<String> { &self.extend }
 }
 
 impl FieldKind {

@@ -22,4 +22,7 @@ pub enum Error {
 
     #[error("Collect error: {0}")]
     Collect(String),
+
+    #[error("Inheritance error: {0} -> {1}")]
+    Inheritance(String, String),
 }

@@ -34,53 +34,25 @@ pub trait Loadable: Sized {
     fn load(rows: &[&[calamine::Data]]) -> Result<(), LoadError>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum LoadError {
-    Workbook(calamine::OdsError),
-    Sheet(calamine::Error),
+    #[error("Workbook error: {0}")]
+    Workbook(#[from] calamine::OdsError),
+    
+    #[error("Sheet error: {0}")]
+    Sheet(#[from] calamine::Error),
+
+    #[error("Parse error: {0}")]
     Parse(String),
+
+    #[error("Missing link for {type_name}({id})")]
     MissingLink { type_name: &'static str, id: DataId },
+
+    #[error("{type_name} is already loaded")]
     AlreadyLoaded { type_name: &'static str },
+
+    #[error("Duplicate id on {type_name}({id})")]
     DuplicatedId { type_name: &'static str, id: DataId },
-}
-
-impl std::fmt::Display for LoadError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LoadError::Workbook(e) => {
-                write!(f, "{e}")
-            },
-            LoadError::Sheet(e) => {
-                write!(f, "{e}")
-            },
-            LoadError::Parse(e) => {
-                write!(f, "{e}")
-            },
-            LoadError::MissingLink { type_name, id } => {
-                write!(f, "Missing link to {type_name} of id {id}")
-            },
-            LoadError::AlreadyLoaded { type_name } => {
-                write!(f, "{type_name} is already loaded")
-            }
-            LoadError::DuplicatedId { type_name, id } => {
-                write!(f, "Duplicated id {id} in {type_name}")
-            },
-        }
-    }
-}
-
-impl std::error::Error for LoadError {}
-
-impl From<calamine::OdsError> for LoadError {
-    fn from(value: calamine::OdsError) -> Self {
-        LoadError::Workbook(value)
-    }
-}
-
-impl From<calamine::Error> for LoadError {
-    fn from(e: calamine::Error) -> Self {
-        LoadError::Sheet(e)
-    }
 }
 
 pub fn parse_id(value: &calamine::Data) -> Result<DataId, LoadError> {

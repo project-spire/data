@@ -2,7 +2,6 @@ use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
 use glob::glob;
-use serde::Deserialize;
 use crate::*;
 use crate::generator::constant::*;
 use crate::generator::enumeration::*;
@@ -174,14 +173,9 @@ impl Generator {
 
     fn build_table_hierarchies(&mut self) -> Result<(), Error> {
         for (index, table) in self.tables.iter().enumerate() {
-            let extend = match &table.schema {
-                TableSchema::Concrete { extend, .. } => extend,
-                TableSchema::Abstract { extend, .. } => extend,
-            };
-            let extend = if let Some(e) = extend {
-                e
-            } else {
-                continue;
+            let extend = match table.schema.schematic().extend() {
+                Some(extend) => extend,
+                None => continue,
             };
 
             self.table_hierarchies
@@ -199,11 +193,7 @@ impl Generator {
         for (index, table) in self.tables.iter().enumerate() {
             graph.insert(index, Vec::new());
 
-            let fields: &[Field] = match &table.schema {
-                TableSchema::Concrete { fields, .. } => fields,
-                TableSchema::Abstract { fields, .. }=> fields,
-            };
-
+            let fields = self.get_table_all_fields(table.schema.schematic())?;
             for field in fields {
                 let link_type = match &field.kind {
                     FieldKind::Link { link_type } => link_type,
