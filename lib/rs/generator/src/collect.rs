@@ -172,6 +172,10 @@ impl Generator {
     }
 
     fn build_table_hierarchies(&mut self) -> Result<(), Error> {
+        for (index, _) in self.tables.iter().enumerate() {
+            self.table_hierarchies.insert(index, Vec::new());
+        }
+
         for (index, table) in self.tables.iter().enumerate() {
             let extend = match table.schema.schematic().extend() {
                 Some(extend) => extend,
@@ -179,9 +183,9 @@ impl Generator {
             };
 
             self.table_hierarchies
-                .entry(index)
-                .and_modify(|childs| childs.push(*self.table_indices.get(extend).unwrap()))
-                .or_insert(Vec::new());
+                .get_mut(&self.table_indices[extend])
+                .unwrap()
+                .push(index);
         }
         
         Ok(())

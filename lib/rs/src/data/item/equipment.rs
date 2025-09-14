@@ -1,8 +1,9 @@
 // This is a generated file. DO NOT MODIFY.
+use std::collections::HashMap;
 use tracing::info;
 use crate::{DataId, error::Error};
 
-pub static EQUIPMENT_DATA: tokio::sync::OnceCell<EquipmentData> = tokio::sync::OnceCell::const_new();
+static EQUIPMENT_DATA: tokio::sync::OnceCell<EquipmentData> = tokio::sync::OnceCell::const_new();
 
 #[derive(Debug)]
 pub struct Equipment {
@@ -38,22 +39,22 @@ impl crate::Linkable for Equipment {
 }
 
 pub struct EquipmentData {
-    data: std::collections::HashMap<DataId, Equipment>,
+    data: HashMap<DataId, Equipment>,
 }
 
 impl EquipmentData {
     pub fn get(id: DataId) -> Option<&'static Equipment> {
-        EQUIPMENT_DATA
-            .get()
-            .expect("EQUIPMENT_DATA is not initialized yet")
-            .data
-            .get(&id)
+        EQUIPMENT_DATA.get().unwrap().data.get(&id)
+    }
+
+    pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static Equipment)> {
+        EQUIPMENT_DATA.get().unwrap().data.iter()
     }
 }
 
 impl crate::Loadable for EquipmentData {
     fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {
-        let mut objects = std::collections::HashMap::new();
+        let mut objects = HashMap::new();
         for row in rows {
             let (id, object) = Equipment::parse(row)?;
 

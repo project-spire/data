@@ -1,8 +1,9 @@
 // This is a generated file. DO NOT MODIFY.
+use std::collections::HashMap;
 use tracing::info;
 use crate::{DataId, error::Error};
 
-pub static RACE_STAT_DATA: tokio::sync::OnceCell<RaceStatData> = tokio::sync::OnceCell::const_new();
+static RACE_STAT_DATA: tokio::sync::OnceCell<RaceStatData> = tokio::sync::OnceCell::const_new();
 
 #[derive(Debug)]
 pub struct RaceStat {
@@ -38,22 +39,22 @@ impl crate::Linkable for RaceStat {
 }
 
 pub struct RaceStatData {
-    data: std::collections::HashMap<DataId, RaceStat>,
+    data: HashMap<DataId, RaceStat>,
 }
 
 impl RaceStatData {
     pub fn get(id: DataId) -> Option<&'static RaceStat> {
-        RACE_STAT_DATA
-            .get()
-            .expect("RACE_STAT_DATA is not initialized yet")
-            .data
-            .get(&id)
+        RACE_STAT_DATA.get().unwrap().data.get(&id)
+    }
+
+    pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static RaceStat)> {
+        RACE_STAT_DATA.get().unwrap().data.iter()
     }
 }
 
 impl crate::Loadable for RaceStatData {
     fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {
-        let mut objects = std::collections::HashMap::new();
+        let mut objects = HashMap::new();
         for row in rows {
             let (id, object) = RaceStat::parse(row)?;
 

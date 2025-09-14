@@ -171,10 +171,11 @@ impl Generator {
 
         Ok(format!(
 r#"{GENERATED_FILE_WARNING}
+use std::collections::HashMap;
 use tracing::info;
 use {CRATE_PREFIX}::{{DataId, error::Error}};
 
-pub static {data_cell_name}: tokio::sync::OnceCell<{data_type_name}> = tokio::sync::OnceCell::const_new();
+static {data_cell_name}: tokio::sync::OnceCell<{data_type_name}> = tokio::sync::OnceCell::const_new();
 
 #[derive(Debug)]
 pub struct {table_type_name}{lifetime_code} {{
@@ -204,22 +205,22 @@ impl{lifetime_code} {CRATE_PREFIX}::Linkable for {table_type_name}{lifetime_para
 }}
 
 pub struct {data_type_name}{lifetime_code} {{
-    data: std::collections::HashMap<DataId, {table_type_name}{lifetime_code}>,
+    data: HashMap<DataId, {table_type_name}{lifetime_code}>,
 }}
 
 impl{lifetime_code} {data_type_name}{lifetime_parameter_code} {{
     pub fn get(id: DataId) -> Option<&'static {table_type_name}> {{
-        {data_cell_name}
-            .get()
-            .expect("{data_cell_name} is not initialized yet")
-            .data
-            .get(&id)
+        {data_cell_name}.get().unwrap().data.get(&id)
+    }}
+
+    pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static {table_type_name})> {{
+        {data_cell_name}.get().unwrap().data.iter()
     }}
 }}
 
 impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_parameter_code} {{
     fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {{
-        let mut objects = std::collections::HashMap::new();
+        let mut objects = HashMap::new();
         for row in rows {{
             let (id, object) = {table_type_name}::parse(row)?;
 
@@ -251,8 +252,90 @@ impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_param
         name: &Name,
         schema: &AbstractTableSchema,
     ) -> Result<String, Error> {
+        let data_cell_name = name.as_data_type_cell();
+        let data_type_name = name.as_data_type();
+        let table_type_name = name.as_type(false);
+
+        let mut child_types = Vec::new();
+        let mut child_id_matches = Vec::new();
+        let mut child_loads = Vec::new();
+
+        for index in &self.table_hierarchies[&self.table_indices[&name.as_type(true)]] {
+            let child_name = self.tables[*index].name.as_type(false);
+            let child_full_name = self.tables[*index].name.as_type(true);
+            let child_full_data_name = child_full_name.clone() + "Data";
+
+            child_types.push(format!(
+                "{TAB}{}(&'static {CRATE_PREFIX}::{}),",
+                child_name,
+                child_full_name,
+            ));
+
+            child_id_matches.push(format!(
+                "{TAB}{TAB}{TAB}Self::{child_name}(x) => &x.id,"
+            ));
+
+            child_loads.push(format!(
+r#"        for (id, row) in {CRATE_PREFIX}::{child_full_data_name}::iter() {{
+            check(&data, id)?;
+            data.insert(*id, {table_type_name}::{child_name}(row));
+        }}"#
+            ));
+        }
+
+        let child_types_code = child_types.join("\n");
+        let child_id_matches_code = child_id_matches.join("\n");
+        let child_loads_code = child_loads.join("\n");
+
         Ok(format!(
-r#"{GENERATED_FILE_WARNING}
+            r#"{GENERATED_FILE_WARNING}
+use std::collections::HashMap;
+use tracing::info;
+use {CRATE_PREFIX}::{{DataId, error::Error}};
+
+static {data_cell_name}: tokio::sync::OnceCell<{data_type_name}> = tokio::sync::OnceCell::const_new();
+
+#[derive(Debug)]
+pub enum {table_type_name} {{
+{child_types_code}
+}}
+
+pub struct {data_type_name} {{
+    data: HashMap<DataId, {table_type_name}>,
+}}
+
+impl {table_type_name} {{
+    pub fn id(&self) -> &DataId {{
+        match self {{
+{child_id_matches_code}
+        }}
+    }}
+}}
+
+impl {CRATE_PREFIX}::Loadable for {data_type_name} {{
+    fn load(_: &[&[calamine::Data]]) -> Result<(), Error> {{
+        fn check(data: &HashMap<DataId, {table_type_name}>, id: &DataId) -> Result<(), Error> {{
+            if data.contains_key(id) {{
+                return Err(Error::DuplicatedId {{
+                    type_name: std::any::type_name::<{table_type_name}>(),
+                    id: *id,
+                }});
+            }}
+            Ok(())
+        }};
+
+        let mut data = HashMap::new();
+
+{child_loads_code}
+
+        if !{data_cell_name}.set(Self {{ data }}).is_ok() {{
+            return Err(Error::AlreadyLoaded {{
+                type_name: std::any::type_name::<{table_type_name}>(),
+            }});
+        }}
+        Ok(())
+    }}
+}}
 "#
         ))
     }

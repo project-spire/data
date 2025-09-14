@@ -1,8 +1,9 @@
 // This is a generated file. DO NOT MODIFY.
+use std::collections::HashMap;
 use tracing::info;
 use crate::{DataId, error::Error};
 
-pub static RANDOM_BOX_DATA: tokio::sync::OnceCell<RandomBoxData> = tokio::sync::OnceCell::const_new();
+static RANDOM_BOX_DATA: tokio::sync::OnceCell<RandomBoxData> = tokio::sync::OnceCell::const_new();
 
 #[derive(Debug)]
 pub struct RandomBox {
@@ -38,22 +39,22 @@ impl crate::Linkable for RandomBox {
 }
 
 pub struct RandomBoxData {
-    data: std::collections::HashMap<DataId, RandomBox>,
+    data: HashMap<DataId, RandomBox>,
 }
 
 impl RandomBoxData {
     pub fn get(id: DataId) -> Option<&'static RandomBox> {
-        RANDOM_BOX_DATA
-            .get()
-            .expect("RANDOM_BOX_DATA is not initialized yet")
-            .data
-            .get(&id)
+        RANDOM_BOX_DATA.get().unwrap().data.get(&id)
+    }
+
+    pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static RandomBox)> {
+        RANDOM_BOX_DATA.get().unwrap().data.iter()
     }
 }
 
 impl crate::Loadable for RandomBoxData {
     fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {
-        let mut objects = std::collections::HashMap::new();
+        let mut objects = HashMap::new();
         for row in rows {
             let (id, object) = RandomBox::parse(row)?;
 
