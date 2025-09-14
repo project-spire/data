@@ -2,13 +2,13 @@ use std::str::FromStr;
 use calamine::DataType;
 use crate::{DataId, Link, Linkable, Error};
 
-trait Parsable: Sized {
+pub(crate) trait Parsable: Sized {
     fn parse(value: &calamine::Data) -> Result<Self, Error>;
 
     fn parse_str(s: &str) -> Result<Self, Error>;
 }
 
-pub fn parse_id(value: &calamine::Data) -> Result<DataId, Error> {
+pub(crate) fn parse_id(value: &calamine::Data) -> Result<DataId, Error> {
     let i = match value.as_i64() {
         Some(i) => i,
         None => return Err(Error::Parse(format!("{} is not Id", value.to_string()))),
@@ -21,7 +21,7 @@ pub fn parse_id(value: &calamine::Data) -> Result<DataId, Error> {
     Ok(DataId(i as u32))
 }
 
-pub fn parse_i8(value: &calamine::Data) -> Result<i8, Error> {
+pub(crate) fn parse_i8(value: &calamine::Data) -> Result<i8, Error> {
     let i = match value.as_i64() {
         Some(i) => i,
         None => return Err(Error::Parse(format!("{} is not i8", value.to_string()))),
@@ -34,7 +34,7 @@ pub fn parse_i8(value: &calamine::Data) -> Result<i8, Error> {
     Ok(i as i8)
 }
 
-pub fn parse_i16(value: &calamine::Data) -> Result<i16, Error> {
+pub(crate) fn parse_i16(value: &calamine::Data) -> Result<i16, Error> {
     let i = match value.as_i64() {
         Some(i) => i,
         None => return Err(Error::Parse(format!("{} is not i16", value.to_string()))),
@@ -47,7 +47,7 @@ pub fn parse_i16(value: &calamine::Data) -> Result<i16, Error> {
     Ok(i as i16)
 }
 
-pub fn parse_i32(value: &calamine::Data) -> Result<i32, Error> {
+pub(crate) fn parse_i32(value: &calamine::Data) -> Result<i32, Error> {
     let i = match value.as_i64() {
         Some(i) => i,
         None => return Err(Error::Parse(format!("{} is not i32", value.to_string()))),
@@ -60,7 +60,7 @@ pub fn parse_i32(value: &calamine::Data) -> Result<i32, Error> {
     Ok(i as i32)
 }
 
-pub fn parse_i64(value: &calamine::Data) -> Result<i64, Error> {
+pub(crate) fn parse_i64(value: &calamine::Data) -> Result<i64, Error> {
     let i = match value.as_i64() {
         Some(i) => i,
         None => return Err(Error::Parse(format!("{} is not i64", value.to_string()))),
@@ -69,7 +69,7 @@ pub fn parse_i64(value: &calamine::Data) -> Result<i64, Error> {
     Ok(i)
 }
 
-pub fn parse_u8(value: &calamine::Data) -> Result<u8, Error> {
+pub(crate) fn parse_u8(value: &calamine::Data) -> Result<u8, Error> {
     let i = match value.as_i64() {
         Some(i) => i,
         None => return Err(Error::Parse(format!("{} is not u8", value.to_string()))),
@@ -82,7 +82,7 @@ pub fn parse_u8(value: &calamine::Data) -> Result<u8, Error> {
     Ok(i as u8)
 }
 
-pub fn parse_u16(value: &calamine::Data) -> Result<u16, Error> {
+pub(crate) fn parse_u16(value: &calamine::Data) -> Result<u16, Error> {
     let i = match value.as_i64() {
         Some(i) => i,
         None => return Err(Error::Parse(format!("{} is not u16", value.to_string()))),
@@ -95,7 +95,7 @@ pub fn parse_u16(value: &calamine::Data) -> Result<u16, Error> {
     Ok(i as u16)
 }
 
-pub fn parse_u32(value: &calamine::Data) -> Result<u32, Error> {
+pub(crate) fn parse_u32(value: &calamine::Data) -> Result<u32, Error> {
     let i = match value.as_i64() {
         Some(i) => i,
         None => return Err(Error::Parse(format!("{} is not u32", value.to_string()))),
@@ -108,7 +108,7 @@ pub fn parse_u32(value: &calamine::Data) -> Result<u32, Error> {
     Ok(i as u32)
 }
 
-pub fn parse_u64(value: &calamine::Data) -> Result<u64, Error> {
+pub(crate) fn parse_u64(value: &calamine::Data) -> Result<u64, Error> {
     let i = match value.as_i64() {
         Some(i) => i,
         None => return Err(Error::Parse(format!("{} is not u64", value.to_string()))),
@@ -117,7 +117,7 @@ pub fn parse_u64(value: &calamine::Data) -> Result<u64, Error> {
     Ok(i as u64)
 }
 
-pub fn parse_f32(value: &calamine::Data) -> Result<f32, Error> {
+pub(crate) fn parse_f32(value: &calamine::Data) -> Result<f32, Error> {
     let f = match value.get_float() {
         Some(f) => f,
         None => return Err(Error::Parse(format!("{} is not f32", value.to_string()))),
@@ -135,7 +135,7 @@ pub fn parse_f64(value: &calamine::Data) -> Result<f64, Error> {
     Ok(f)
 }
 
-pub fn parse_string(value: &calamine::Data) -> Result<String, Error> {
+pub(crate) fn parse_string(value: &calamine::Data) -> Result<String, Error> {
     let s = match value.get_string() {
         Some(s) => s,
         None => return Err(Error::Parse(format!("{} is not String", value.to_string()))),
@@ -144,9 +144,9 @@ pub fn parse_string(value: &calamine::Data) -> Result<String, Error> {
     Ok(s.trim().to_owned())
 }
 
-pub fn parse_link<'a, T: 'static + Linkable>(value: &calamine::Data) -> Result<Link<'a, T>, Error> {
+pub(crate) fn parse_link<'a, T: 'static + Linkable>(value: &calamine::Data) -> Result<Link<'a, T>, Error> {
     let id = parse_id(value)?;
-    let target = T::get(id).ok_or_else(|| Error::MissingLink {
+    let target = T::get(&id).ok_or_else(|| Error::MissingLink {
         type_name: std::any::type_name::<T>(),
         id,
     })?;
@@ -154,7 +154,7 @@ pub fn parse_link<'a, T: 'static + Linkable>(value: &calamine::Data) -> Result<L
     Ok(Link { id, target })
 }
 
-pub fn parse_tuple_2<T1, T2>(value: &calamine::Data) -> Result<(T1, T2), Error>
+pub(crate) fn parse_tuple_2<T1, T2>(value: &calamine::Data) -> Result<(T1, T2), Error>
 where
     T1: Parsable,
     T2: Parsable,
@@ -167,7 +167,7 @@ where
     Ok((first, second))
 }
 
-pub fn parse_tuple_3<T1, T2, T3>(value: &calamine::Data) -> Result<(T1, T2, T3), Error>
+pub(crate) fn parse_tuple_3<T1, T2, T3>(value: &calamine::Data) -> Result<(T1, T2, T3), Error>
 where
     T1: Parsable,
     T2: Parsable,
@@ -182,7 +182,7 @@ where
     Ok((first, second, third))
 }
 
-pub fn parse_tuple_4<T1, T2, T3, T4>(value: &calamine::Data) -> Result<(T1, T2, T3, T4), Error>
+pub(crate) fn parse_tuple_4<T1, T2, T3, T4>(value: &calamine::Data) -> Result<(T1, T2, T3, T4), Error>
 where
     T1: Parsable,
     T2: Parsable,
@@ -289,6 +289,20 @@ impl Parsable for i64 {
 
     fn parse_str(s: &str) -> Result<Self, Error> {
         Ok(i64::from_str(s).map_err(|_| Error::Parse(format!("{} is not i64", s)))?)
+    }
+}
+
+impl<T: 'static + Linkable> Parsable for Link<'static, T> {
+    fn parse(value: &calamine::Data) -> Result<Self, Error> { parse_link(value) }
+
+    fn parse_str(s: &str) -> Result<Self, Error> {
+        let id = DataId::parse_str(s)?;
+        let target = T::get(&id).ok_or_else(|| Error::MissingLink {
+            type_name: std::any::type_name::<T>(),
+            id,
+        })?;
+
+        Ok(Link { id, target })
     }
 }
 

@@ -12,6 +12,10 @@ pub struct RaceStat {
     pub speed: f32,
 }
 
+pub struct RaceStatData {
+    data: HashMap<DataId, RaceStat>,
+}
+
 impl RaceStat {
     fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), Error> {
         const FIELDS_COUNT: usize = 3;
@@ -33,17 +37,13 @@ impl RaceStat {
 }
 
 impl crate::Linkable for RaceStat {
-    fn get(id: DataId) -> Option<&'static Self> {
+    fn get(id: &DataId) -> Option<&'static Self> {
         RaceStatData::get(id)
     }
 }
 
-pub struct RaceStatData {
-    data: HashMap<DataId, RaceStat>,
-}
-
 impl RaceStatData {
-    pub fn get(id: DataId) -> Option<&'static RaceStat> {
+    pub fn get(id: &DataId) -> Option<&'static RaceStat> {
         RACE_STAT_DATA.get().unwrap().data.get(&id)
     }
 

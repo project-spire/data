@@ -6,7 +6,7 @@ pub use data::*;
 mod parse;
 mod error;
 
-pub use parse::*;
+pub(crate) use parse::*;
 
 use std::ops::Deref;
 use std::str::FromStr;
@@ -22,18 +22,12 @@ pub struct Link<'a, T> {
 }
 
 pub trait Linkable: Sized {
-    fn get(id: DataId) -> Option<&'static Self>;
+    fn get(id: &DataId) -> Option<&'static Self>;
 }
 
 pub trait Loadable: Sized {
     fn load(rows: &[&[calamine::Data]]) -> Result<(), Error>;
 }
-
-// impl<'a, T> Link<'a, T> {
-//     pub fn id(&self) -> DataId {
-//         self.id
-//     }
-// }
 
 impl std::fmt::Display for DataId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

@@ -1,6 +1,5 @@
 // This is a generated file. DO NOT MODIFY.
 use std::collections::HashMap;
-use tracing::info;
 use crate::{DataId, error::Error};
 
 static ITEM_DATA: tokio::sync::OnceCell<ItemData> = tokio::sync::OnceCell::const_new();
@@ -24,6 +23,22 @@ impl Item {
     }
 }
 
+impl crate::Linkable for Item {
+    fn get(id: &DataId) -> Option<&'static Self> {
+        ItemData::get(id)
+    }
+}
+
+impl ItemData {
+    pub fn get(id: &DataId) -> Option<&'static Item> {
+        ITEM_DATA.get().unwrap().data.get(&id)
+    }
+
+    pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static Item)> {
+        ITEM_DATA.get().unwrap().data.iter()
+    }
+}
+
 impl crate::Loadable for ItemData {
     fn load(_: &[&[calamine::Data]]) -> Result<(), Error> {
         fn check(data: &HashMap<DataId, Item>, id: &DataId) -> Result<(), Error> {
@@ -34,7 +49,7 @@ impl crate::Loadable for ItemData {
                 });
             }
             Ok(())
-        };
+        }
 
         let mut data = HashMap::new();
 

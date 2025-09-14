@@ -182,6 +182,10 @@ pub struct {table_type_name}{lifetime_code} {{
 {field_definitions_code}
 }}
 
+pub struct {data_type_name}{lifetime_code} {{
+    data: HashMap<DataId, {table_type_name}{lifetime_code}>,
+}}
+
 impl {table_type_name}{lifetime_code} {{
     fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), Error> {{
         const FIELDS_COUNT: usize = {fields_count};
@@ -199,17 +203,13 @@ impl {table_type_name}{lifetime_code} {{
 }}
 
 impl{lifetime_code} {CRATE_PREFIX}::Linkable for {table_type_name}{lifetime_parameter_code} {{
-    fn get(id: DataId) -> Option<&'static Self> {{
+    fn get(id: &DataId) -> Option<&'static Self> {{
         {data_type_name}::get(id)
     }}
 }}
 
-pub struct {data_type_name}{lifetime_code} {{
-    data: HashMap<DataId, {table_type_name}{lifetime_code}>,
-}}
-
 impl{lifetime_code} {data_type_name}{lifetime_parameter_code} {{
-    pub fn get(id: DataId) -> Option<&'static {table_type_name}> {{
+    pub fn get(id: &DataId) -> Option<&'static {table_type_name}> {{
         {data_cell_name}.get().unwrap().data.get(&id)
     }}
 
@@ -290,7 +290,6 @@ r#"        for (id, row) in {CRATE_PREFIX}::{child_full_data_name}::iter() {{
         Ok(format!(
             r#"{GENERATED_FILE_WARNING}
 use std::collections::HashMap;
-use tracing::info;
 use {CRATE_PREFIX}::{{DataId, error::Error}};
 
 static {data_cell_name}: tokio::sync::OnceCell<{data_type_name}> = tokio::sync::OnceCell::const_new();
@@ -312,6 +311,22 @@ impl {table_type_name} {{
     }}
 }}
 
+impl {CRATE_PREFIX}::Linkable for {table_type_name} {{
+    fn get(id: &DataId) -> Option<&'static Self> {{
+        {data_type_name}::get(id)
+    }}
+}}
+
+impl {data_type_name} {{
+    pub fn get(id: &DataId) -> Option<&'static {table_type_name}> {{
+        {data_cell_name}.get().unwrap().data.get(&id)
+    }}
+
+    pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static {table_type_name})> {{
+        {data_cell_name}.get().unwrap().data.iter()
+    }}
+}}
+
 impl {CRATE_PREFIX}::Loadable for {data_type_name} {{
     fn load(_: &[&[calamine::Data]]) -> Result<(), Error> {{
         fn check(data: &HashMap<DataId, {table_type_name}>, id: &DataId) -> Result<(), Error> {{
@@ -322,7 +337,7 @@ impl {CRATE_PREFIX}::Loadable for {data_type_name} {{
                 }});
             }}
             Ok(())
-        }};
+        }}
 
         let mut data = HashMap::new();
 

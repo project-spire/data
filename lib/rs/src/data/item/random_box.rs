@@ -12,6 +12,10 @@ pub struct RandomBox {
     pub items: (crate::Link<'static, crate::item::Item>, u16),
 }
 
+pub struct RandomBoxData {
+    data: HashMap<DataId, RandomBox>,
+}
+
 impl RandomBox {
     fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), Error> {
         const FIELDS_COUNT: usize = 3;
@@ -33,17 +37,13 @@ impl RandomBox {
 }
 
 impl crate::Linkable for RandomBox {
-    fn get(id: DataId) -> Option<&'static Self> {
+    fn get(id: &DataId) -> Option<&'static Self> {
         RandomBoxData::get(id)
     }
 }
 
-pub struct RandomBoxData {
-    data: HashMap<DataId, RandomBox>,
-}
-
 impl RandomBoxData {
-    pub fn get(id: DataId) -> Option<&'static RandomBox> {
+    pub fn get(id: &DataId) -> Option<&'static RandomBox> {
         RANDOM_BOX_DATA.get().unwrap().data.get(&id)
     }
 

@@ -12,6 +12,10 @@ pub struct Equipment {
     pub kind: crate::item::EquipmentKind,
 }
 
+pub struct EquipmentData {
+    data: HashMap<DataId, Equipment>,
+}
+
 impl Equipment {
     fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), Error> {
         const FIELDS_COUNT: usize = 3;
@@ -33,17 +37,13 @@ impl Equipment {
 }
 
 impl crate::Linkable for Equipment {
-    fn get(id: DataId) -> Option<&'static Self> {
+    fn get(id: &DataId) -> Option<&'static Self> {
         EquipmentData::get(id)
     }
 }
 
-pub struct EquipmentData {
-    data: HashMap<DataId, Equipment>,
-}
-
 impl EquipmentData {
-    pub fn get(id: DataId) -> Option<&'static Equipment> {
+    pub fn get(id: &DataId) -> Option<&'static Equipment> {
         EQUIPMENT_DATA.get().unwrap().data.get(&id)
     }
 
