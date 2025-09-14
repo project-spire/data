@@ -1,8 +1,10 @@
 // This is a generated file. DO NOT MODIFY.
+#![allow(static_mut_refs)]
+
 use std::collections::HashMap;
 use crate::{DataId, error::Error};
 
-static ITEM_DATA: tokio::sync::OnceCell<ItemData> = tokio::sync::OnceCell::const_new();
+static mut ITEM_DATA: tokio::sync::OnceCell<ItemData> = tokio::sync::OnceCell::const_new();
 
 #[derive(Debug)]
 pub enum Item {
@@ -10,6 +12,7 @@ pub enum Item {
     RandomBox(&'static crate::item::RandomBox),
 }
 
+#[derive(Debug)]
 pub struct ItemData {
     data: HashMap<DataId, Item>,
 }
@@ -17,7 +20,7 @@ pub struct ItemData {
 impl Item {
     pub fn id(&self) -> &DataId {
         match self {
-            Self::Equipment(x) => &x.id,
+            Self::Equipment(x) => &x.id(),
             Self::RandomBox(x) => &x.id,
         }
     }
@@ -31,42 +34,34 @@ impl crate::Linkable for Item {
 
 impl ItemData {
     pub fn get(id: &DataId) -> Option<&'static Item> {
-        ITEM_DATA.get().unwrap().data.get(&id)
+        let data = unsafe { &ITEM_DATA.get().unwrap().data };
+        data.get(&id)
     }
 
     pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static Item)> {
-        ITEM_DATA.get().unwrap().data.iter()
+        let data = unsafe { &ITEM_DATA.get().unwrap().data };
+        data.iter()
+    }
+
+    pub(crate) fn insert(id: &DataId, row: Item) -> Result<(), Error> {
+        let data = unsafe { &mut ITEM_DATA.get_mut().unwrap().data };
+        if data.contains_key(id) {
+            return Err(Error::DuplicateId {
+                type_name: std::any::type_name::<Item>(),
+                id: *id,
+            });
+        }
+        data.insert(*id, row);
+
+        Ok(())
     }
 }
 
 impl crate::Loadable for ItemData {
     fn load(_: &[&[calamine::Data]]) -> Result<(), Error> {
-        fn check(data: &HashMap<DataId, Item>, id: &DataId) -> Result<(), Error> {
-            if data.contains_key(id) {
-                return Err(Error::DuplicatedId {
-                    type_name: std::any::type_name::<Item>(),
-                    id: *id,
-                });
-            }
-            Ok(())
-        }
+        let data = HashMap::new();
+        unsafe { ITEM_DATA.set(Self { data }).unwrap(); }
 
-        let mut data = HashMap::new();
-
-        for (id, row) in crate::item::EquipmentData::iter() {
-            check(&data, id)?;
-            data.insert(*id, Item::Equipment(row));
-        }
-        for (id, row) in crate::item::RandomBoxData::iter() {
-            check(&data, id)?;
-            data.insert(*id, Item::RandomBox(row));
-        }
-
-        if !ITEM_DATA.set(Self { data }).is_ok() {
-            return Err(Error::AlreadyLoaded {
-                type_name: std::any::type_name::<Item>(),
-            });
-        }
         Ok(())
     }
 }

@@ -16,7 +16,7 @@ impl Generator {
         let mut next_modules = vec![base_module];
 
         while let Some(mut module) = next_modules.pop() {
-            let child_modules = self.collect_entities(&mut module)?;
+            let child_modules = self.collect_module(&mut module)?;
 
             for i in 0..child_modules.len() {
                 module.entries.push(EntityEntry::ModuleIndex(self.modules.len() + i + 1));
@@ -32,7 +32,7 @@ impl Generator {
         Ok(())
     }
 
-    fn collect_entities(
+    fn collect_module(
         &mut self,
         module: &mut ModuleEntry,
     ) -> Result<Vec<ModuleEntry>, Error> {
@@ -40,10 +40,12 @@ impl Generator {
         self.log(&format!("Collecting module `{}`", &module_dir.display()));
 
         // Collect entities
-        let entity_files: Vec<PathBuf> = glob(module_dir.join("*.json").to_str().unwrap())
+        let mut entity_files: Vec<PathBuf> = glob(module_dir.join("*.json").to_str().unwrap())
             .unwrap()
             .filter_map(Result::ok)
             .collect();
+        entity_files.sort();
+
         self.log(&format!("Found entity files: {:?}", &entity_files));
 
         for entity_file in entity_files {
@@ -69,13 +71,10 @@ impl Generator {
                     return Err(Error::InvalidFileName(file_name.to_owned()));
                 }
             }
-
-            println!("cargo:rerun-if-changed={}", entity_file.display());
         }
 
         // Collect child modules
         let mut child_modules = Vec::new();
-
         for entry in fs::read_dir(&module_dir)? {
             let entry = entry?;
             let path = entry.path();
@@ -89,6 +88,7 @@ impl Generator {
             self.log(&format!("Found child directory `{}`", dir_name));
             child_modules.push(ModuleEntry::new(module_name));
         }
+        child_modules.sort_by(|a, b| a.name.name.cmp(&b.name.name));
 
         Ok(child_modules)
     }

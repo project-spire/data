@@ -59,7 +59,7 @@ impl crate::Loadable for RaceStatData {
             let (id, object) = RaceStat::parse(row)?;
 
             if objects.contains_key(&id) {
-                return Err(Error::DuplicatedId {
+                return Err(Error::DuplicateId {
                     type_name: std::any::type_name::<RaceStat>(),
                     id,
                 });

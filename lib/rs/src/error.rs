@@ -18,7 +18,7 @@ pub enum Error {
     AlreadyLoaded { type_name: &'static str },
 
     #[error("Duplicate id on {type_name}({id})")]
-    DuplicatedId { type_name: &'static str, id: DataId },
+    DuplicateId { type_name: &'static str, id: DataId },
 
     #[error("Data out of range: expected {expected}, got {actual}")]
     OutOfRange { expected: usize, actual: usize },
