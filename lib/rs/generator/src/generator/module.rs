@@ -120,15 +120,24 @@ r#"{GENERATED_FILE_WARNING}
                 let file = name.parent_namespace().join("/")
                     + &format!("/{}", schema.data);
 
-                handles.push(format!(
-                    "{TAB}add::<{}::{}>({}, \"{}\", &mut {});",
-                    name.parent_namespace().join("::"),
-                    name.as_data_type(),
-                    format!("data_dir.join(\"{}\")", file),
-                    schema.sheet,
-                    handles_name,
+                handles.push((
+                    format!(
+                        "{TAB}add::<{}::{}>({}, \"{}\", &mut {});",
+                        name.parent_namespace().join("::"),
+                        name.as_data_type(),
+                        format!("data_dir.join(\"{}\")", file),
+                        schema.sheet,
+                        handles_name,
+                    ),
+                    file,
                 ));
             }
+
+            handles.sort_by(|(_, a), (_, b)| a.cmp(b));
+            let handles: Vec<&str> = handles.
+                iter()
+                .map(|(code, _)| code.as_str())
+                .collect();
 
             let handles_code = handles.join("\n");
             let code = format!(
