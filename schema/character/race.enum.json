@@ -2,11 +2,11 @@
     "name": "Race",
     "base": "uint16",
     "enums": [
-        "None",
         "Human",
         "Orc"
     ],
     "target": "all",
+    "protocol": true,
     "attributes": [
         {
             "target": "server",

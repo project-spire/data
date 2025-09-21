@@ -14,6 +14,8 @@ pub struct EnumerationSchema {
     base: EnumerationBase,
     enums: Vec<String>,
     target: Target,
+    #[serde(default)]
+    protocol: bool,
     attributes: Vec<EnumerationAttribute>,
 }
 
@@ -38,15 +40,16 @@ impl Generator {
             .join(format!("{}.rs", enumeration.name.as_entity()));
         self.log(&format!("Generating enumeration `{}`", enumeration_file.display()));
 
-        let code = enumeration.generate()?;
+        let mut code = self.generate_code(&enumeration.schema)?;
+        if enumeration.schema.protocol {
+            code += &self.generate_protocol(&enumeration.name, &enumeration.schema)?;
+        }
 
         fs::write(enumeration_file, code)?;
         Ok(())
     }
-}
 
-impl EnumerationEntry {
-    pub fn generate(&self) -> Result<String, Error> {
+    fn generate_code(&self, schema: &EnumerationSchema) -> Result<String, Error> {
         let mut enums = Vec::new();
         let mut enum_parses = Vec::new();
         let mut enum_intos = Vec::new();
@@ -54,7 +57,7 @@ impl EnumerationEntry {
         let mut attributes = Vec::new();
 
         let mut index: u32 = 0;
-        for e in &self.schema.enums {
+        for e in &schema.enums {
             enums.push(format!("{TAB}{e},"));
             enum_parses.push(format!("{TAB}{TAB}{TAB}\"{e}\" => Self::{e},"));
             enum_intos.push(format!("{TAB}{TAB}{TAB}Self::{e} => {index},"));
@@ -63,7 +66,7 @@ impl EnumerationEntry {
             index += 1;
         }
 
-        for attribute in &self.schema.attributes {
+        for attribute in &schema.attributes {
             if !attribute.target.is_target() {
                 continue;
             }
@@ -114,8 +117,41 @@ impl Into<{base_type_name}> for {enum_type_name} {{
     }}
 }}
 "#,
-            enum_type_name = self.name.as_type(false),
-            base_type_name = self.schema.base.to_rust_type(),
+            enum_type_name = schema.name,
+            base_type_name = schema.base.to_rust_type(),
+        ))
+    }
+
+    fn generate_protocol(&self, name: &Name, schema: &EnumerationSchema) -> Result<String, Error> {
+        let protocol_file = self.config.protocol_gen_dir
+            .join(format!("{}.gen.proto", name.name));
+        self.log(&format!("Generating enumeration protocol `{}`", protocol_file.display()));
+
+        let mut enums = Vec::new();
+
+        let mut index: u32 = 0;
+        for e in &schema.enums {
+            enums.push(format!("{TAB}{e} = {index};"));
+            index += 1;
+        }
+
+        let code = format!(
+r#"{GENERATED_FILE_WARNING}
+syntax = "proto3";
+
+package spire.protocol;
+
+enum {enum_type_name} {{
+{enums_code}
+}}
+"#,
+            enum_type_name = name.as_type(false),
+            enums_code = enums.join("\n"),
+        );
+        fs::write(protocol_file, code)?;
+
+        Ok(format!(
+r#""#
         ))
     }
 }

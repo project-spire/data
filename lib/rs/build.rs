@@ -6,6 +6,8 @@ fn main() {
         schema_dir: PathBuf::from("../../schema"),
         src_dir: PathBuf::from("../../src"),
         gen_dir: PathBuf::from("src/data"),
+        protocol_gen_dir: PathBuf::from("../../../protocol/schema"),
+
         verbose: true,
         dry_run: false,
     };
