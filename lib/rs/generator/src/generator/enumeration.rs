@@ -128,10 +128,13 @@ impl Into<{base_type_name}> for {enum_type_name} {{
         self.log(&format!("Generating enumeration protocol `{}`", protocol_file.display()));
 
         let mut enums = Vec::new();
+        let mut enum_matches = Vec::new();
 
         let mut index: u32 = 0;
         for e in &schema.enums {
             enums.push(format!("{TAB}{e} = {index};"));
+            enum_matches.push(format!("{TAB}{TAB}{TAB}Self::{e} => Target::{e},"));
+
             index += 1;
         }
 
@@ -151,17 +154,40 @@ enum {enum_type_name} {{
         fs::write(protocol_file, code)?;
 
         Ok(format!(
-r#""#
+r#"
+impl Into<protocol::{enum_type_name}> for {enum_type_name} {{
+    fn into(self) -> protocol::{enum_type_name} {{
+        type Target = protocol::Race;
+
+        match self {{
+{enum_matches_code}
+        }}
+    }}
+}}
+
+impl Into<{enum_type_name}> for protocol::{enum_type_name} {{
+    fn into(self) -> {enum_type_name} {{
+        type Target = {enum_type_name};
+
+        match self {{
+{enum_matches_code}
+        }}
+    }}
+}}
+
+"#,
+            enum_type_name = name.as_type(false),
+            enum_matches_code = enum_matches.join("\n"),
         ))
     }
 }
 
 impl EnumerationBase {
-    fn to_rust_type(&self) -> String {
+    fn to_rust_type(&self) -> &str {
         match self {
             EnumerationBase::Uint8 => "u8",
             EnumerationBase::Uint16 => "u16",
             EnumerationBase::Uint32 => "u32",
-        }.to_string()
+        }
     }
 }

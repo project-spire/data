@@ -38,3 +38,26 @@ impl Into<u16> for Race {
         }
     }
 }
+
+impl Into<protocol::Race> for Race {
+    fn into(self) -> protocol::Race {
+        type Target = protocol::Race;
+
+        match self {
+            Self::Human => Target::Human,
+            Self::Orc => Target::Orc,
+        }
+    }
+}
+
+impl Into<Race> for protocol::Race {
+    fn into(self) -> Race {
+        type Target = Race;
+
+        match self {
+            Self::Human => Target::Human,
+            Self::Orc => Target::Orc,
+        }
+    }
+}
+
