@@ -3,7 +3,7 @@ mod generator;
 mod error;
 mod name;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use serde::Deserialize;
 use crate::name::Name;
 use crate::error::Error;

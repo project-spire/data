@@ -1,6 +1,6 @@
 // This is a generated file. DO NOT MODIFY.
-pub mod character;
 pub mod item;
+pub mod character;
 
 
 
@@ -39,10 +39,13 @@ pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), Error> {
         Ok(())
     }
 
+    item::EquipmentData::init();
+    item::ItemData::init();
+
     let mut level_0_handles = Vec::new();
     add::<character::RaceStatData>(data_dir.join("character/race_stat.ods"), "RaceStat", &mut level_0_handles);
-    add::<item::EquipmentData>(data_dir.join("item/equipment.ods"), "Equipment", &mut level_0_handles);
     add::<item::RandomBoxData>(data_dir.join("item/random_box.ods"), "RandomBox", &mut level_0_handles);
+    add::<item::WeaponData>(data_dir.join("item/weapon.ods"), "Weapon", &mut level_0_handles);
 
     join(level_0_handles).await?;
 

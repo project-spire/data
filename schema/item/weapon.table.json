@@ -1,0 +1,15 @@
+{
+    "name": "Weapon",
+    "type": "concrete",
+    "extend": "item::Equipment",
+    "data": "weapon.ods",
+    "sheet": "Weapon",
+    "fields": [
+        {
+            "name": "damage",
+            "kind": "scalar",
+            "type": "uint32",
+            "target": "all"
+        }
+    ]
+}

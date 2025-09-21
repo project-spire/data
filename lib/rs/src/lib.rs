@@ -1,14 +1,12 @@
 pub mod data;
-
-use std::fmt::Formatter;
-pub use data::*;
+pub use crate::data::*;
+pub(crate) use parse::*;
 
 mod parse;
 mod error;
 
-pub(crate) use parse::*;
-
 use std::ops::Deref;
+use std::fmt::Formatter;
 use std::str::FromStr;
 use crate::error::Error;
 

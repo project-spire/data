@@ -3,22 +3,23 @@ use std::collections::HashMap;
 use tracing::info;
 use crate::{DataId, error::Error};
 
-static RANDOM_BOX_DATA: tokio::sync::OnceCell<RandomBoxData> = tokio::sync::OnceCell::const_new();
+static WEAPON_DATA: tokio::sync::OnceCell<WeaponData> = tokio::sync::OnceCell::const_new();
 
 #[derive(Debug)]
-pub struct RandomBox {
+pub struct Weapon {
     pub id: DataId,
     pub name: String,
-    pub items: (crate::Link<'static, crate::item::Item>, u16),
+    pub weight: u16,
+    pub damage: u32,
 }
 
-pub struct RandomBoxData {
-    data: HashMap<DataId, RandomBox>,
+pub struct WeaponData {
+    data: HashMap<DataId, Weapon>,
 }
 
-impl RandomBox {
+impl Weapon {
     fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), Error> {
-        const FIELDS_COUNT: usize = 3;
+        const FIELDS_COUNT: usize = 4;
 
         if row.len() != FIELDS_COUNT {
             return Err(Error::OutOfRange { expected: FIELDS_COUNT, actual: row.len() });
@@ -26,41 +27,43 @@ impl RandomBox {
 
         let id = crate::parse_id(&row[0])?;
         let name = crate::parse_string(&row[1])?;
-        let items = crate::parse_tuple_2::<crate::Link<'static, crate::item::Item>, u16>(&row[2])?;
+        let weight = crate::parse_u16(&row[2])?;
+        let damage = crate::parse_u32(&row[3])?;
 
         Ok((id, Self {
             id,
             name,
-            items,
+            weight,
+            damage,
         }))
     }
 }
 
-impl crate::Linkable for RandomBox {
+impl crate::Linkable for Weapon {
     fn get(id: &DataId) -> Option<&'static Self> {
-        RandomBoxData::get(id)
+        WeaponData::get(id)
     }
 }
 
-impl RandomBoxData {
-    pub fn get(id: &DataId) -> Option<&'static RandomBox> {
-        RANDOM_BOX_DATA.get().unwrap().data.get(&id)
+impl WeaponData {
+    pub fn get(id: &DataId) -> Option<&'static Weapon> {
+        WEAPON_DATA.get().unwrap().data.get(&id)
     }
 
-    pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static RandomBox)> {
-        RANDOM_BOX_DATA.get().unwrap().data.iter()
+    pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static Weapon)> {
+        WEAPON_DATA.get().unwrap().data.iter()
     }
 }
 
-impl crate::Loadable for RandomBoxData {
+impl crate::Loadable for WeaponData {
     fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {
         let mut objects = HashMap::new();
         for row in rows {
-            let (id, object) = RandomBox::parse(row)?;
+            let (id, object) = Weapon::parse(row)?;
 
             if objects.contains_key(&id) {
                 return Err(Error::DuplicateId {
-                    type_name: std::any::type_name::<RandomBox>(),
+                    type_name: std::any::type_name::<Weapon>(),
                     id,
                 });
             }
@@ -68,9 +71,9 @@ impl crate::Loadable for RandomBoxData {
             objects.insert(id, object);
         }
 
-        if !RANDOM_BOX_DATA.set(Self { data: objects }).is_ok() {
+        if !WEAPON_DATA.set(Self { data: objects }).is_ok() {
             return Err(Error::AlreadyLoaded {
-                type_name: std::any::type_name::<RandomBox>(),
+                type_name: std::any::type_name::<Weapon>(),
             });
         }
 

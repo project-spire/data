@@ -225,7 +225,7 @@ impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_param
             let (id, object) = {table_type_name}::parse(row)?;
 
             if objects.contains_key(&id) {{
-                return Err(Error::DuplicatedId {{
+                return Err(Error::DuplicateId {{
                     type_name: std::any::type_name::<{table_type_name}>(),
                     id,
                 }});
@@ -258,12 +258,11 @@ impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_param
 
         let mut child_types = Vec::new();
         let mut child_id_matches = Vec::new();
-        let mut child_loads = Vec::new();
 
         for index in &self.table_hierarchies[&self.table_indices[&name.as_type(true)]] {
-            let child_name = self.tables[*index].name.as_type(false);
-            let child_full_name = self.tables[*index].name.as_type(true);
-            let child_full_data_name = child_full_name.clone() + "Data";
+            let child_table = &self.tables[*index];
+            let child_name = child_table.name.as_type(false);
+            let child_full_name = child_table.name.as_type(true);
 
             child_types.push(format!(
                 "{TAB}{}(&'static {CRATE_PREFIX}::{}),",
@@ -272,33 +271,44 @@ impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_param
             ));
 
             child_id_matches.push(format!(
-                "{TAB}{TAB}{TAB}Self::{child_name}(x) => &x.id,"
-            ));
-
-            child_loads.push(format!(
-r#"        for (id, row) in {CRATE_PREFIX}::{child_full_data_name}::iter() {{
-            check(&data, id)?;
-            data.insert(*id, {table_type_name}::{child_name}(row));
-        }}"#
+                "{TAB}{TAB}{TAB}Self::{child_name}(x) => &x.id{},",
+                match child_table.schema {
+                    TableSchema::Concrete(_) => "",
+                    TableSchema::Abstract(_) => "()",
+                }
             ));
         }
 
+        let parent_insert_code = if let Some(parent) = self.get_parent_table(&schema.extend) {
+            let parent_name = parent.name.as_type(false);
+            let parent_full_name = parent.name.as_type(true);
+
+            format!(
+r#"
+
+        {CRATE_PREFIX}::{parent_full_name}Data::insert(id, {CRATE_PREFIX}::{parent_full_name}::{table_type_name}(&data[id]))?;"#
+            )
+        } else {
+            String::new()
+        };
         let child_types_code = child_types.join("\n");
         let child_id_matches_code = child_id_matches.join("\n");
-        let child_loads_code = child_loads.join("\n");
 
         Ok(format!(
             r#"{GENERATED_FILE_WARNING}
+#![allow(static_mut_refs)]
+
 use std::collections::HashMap;
 use {CRATE_PREFIX}::{{DataId, error::Error}};
 
-static {data_cell_name}: tokio::sync::OnceCell<{data_type_name}> = tokio::sync::OnceCell::const_new();
+static mut {data_cell_name}: tokio::sync::OnceCell<{data_type_name}> = tokio::sync::OnceCell::const_new();
 
 #[derive(Debug)]
 pub enum {table_type_name} {{
 {child_types_code}
 }}
 
+#[derive(Debug)]
 pub struct {data_type_name} {{
     data: HashMap<DataId, {table_type_name}>,
 }}
@@ -319,35 +329,30 @@ impl {CRATE_PREFIX}::Linkable for {table_type_name} {{
 
 impl {data_type_name} {{
     pub fn get(id: &DataId) -> Option<&'static {table_type_name}> {{
-        {data_cell_name}.get().unwrap().data.get(&id)
+        let data = unsafe {{ &{data_cell_name}.get().unwrap().data }};
+        data.get(&id)
     }}
 
     pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static {table_type_name})> {{
-        {data_cell_name}.get().unwrap().data.iter()
+        let data = unsafe {{ &{data_cell_name}.get().unwrap().data }};
+        data.iter()
     }}
-}}
+    
+    pub(crate) fn init() {{
+        let data = HashMap::new();
+        unsafe {{ {data_cell_name}.set(Self {{ data }}).unwrap(); }}
+    }}
 
-impl {CRATE_PREFIX}::Loadable for {data_type_name} {{
-    fn load(_: &[&[calamine::Data]]) -> Result<(), Error> {{
-        fn check(data: &HashMap<DataId, {table_type_name}>, id: &DataId) -> Result<(), Error> {{
-            if data.contains_key(id) {{
-                return Err(Error::DuplicatedId {{
-                    type_name: std::any::type_name::<{table_type_name}>(),
-                    id: *id,
-                }});
-            }}
-            Ok(())
-        }}
-
-        let mut data = HashMap::new();
-
-{child_loads_code}
-
-        if !{data_cell_name}.set(Self {{ data }}).is_ok() {{
-            return Err(Error::AlreadyLoaded {{
+    pub(crate) fn insert(id: &DataId, row: {table_type_name}) -> Result<(), Error> {{
+        let data = unsafe {{ &mut {data_cell_name}.get_mut().unwrap().data }};
+        if data.contains_key(id) {{
+            return Err(Error::DuplicateId {{
                 type_name: std::any::type_name::<{table_type_name}>(),
+                id: *id,
             }});
         }}
+        data.insert(*id, row);{parent_insert_code}
+
         Ok(())
     }}
 }}

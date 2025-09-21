@@ -1,14 +1,12 @@
 {
     "name": "Equipment",
-    "type": "concrete",
+    "type": "abstract",
     "extend": "item::Item",
-    "data": "equipment.ods",
-    "sheet": "Equipment",
     "fields": [
         {
-            "name": "kind",
-            "kind": "enum",
-            "type": "item::EquipmentKind",
+            "name": "weight",
+            "kind": "scalar",
+            "type": "uint16",
             "target": "all"
         }
     ]

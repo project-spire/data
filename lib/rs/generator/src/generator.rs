@@ -69,7 +69,7 @@ impl Generator {
         Ok(())
     }
     
-    pub(crate) fn log(&self, message: &str) {
+    pub fn log(&self, message: &str) {
         if !self.config.verbose {
             return;
         }
@@ -79,5 +79,14 @@ impl Generator {
 
     fn full_gen_dir(&self, namespaces: &[String]) -> PathBuf {
         self.config.gen_dir.join(namespaces.join("/"))
+    }
+    
+    fn get_parent_table(&self, extend: &Option<String>) -> Option<&TableEntry> {
+        let parent = match extend {
+            Some(parent) => parent,
+            None => return None,
+        };
+        
+        Some(&self.tables[self.table_indices[parent]])
     }
 }
