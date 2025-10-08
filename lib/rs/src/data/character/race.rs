@@ -4,6 +4,7 @@ use crate::error::Error;
 #[derive(Debug, Clone, Copy, PartialEq, sqlx::Type)]
 #[sqlx(type_name = "race")]
 pub enum Race {
+    None,
     Human,
     Orc,
 }
@@ -13,6 +14,7 @@ impl Race {
         let enum_string = crate::parse_string(value)?;
 
         Ok(match enum_string.as_str() {
+            "None" => Self::None,
             "Human" => Self::Human,
             "Orc" => Self::Orc,
             _ => return Err(Error::Parse(format!(
@@ -23,8 +25,9 @@ impl Race {
 
     pub fn try_from(value: &u16) -> Option<Self> {
         Some(match value {
-            0 => Self::Human,
-            1 => Self::Orc,
+            0 => Self::None,
+            1 => Self::Human,
+            2 => Self::Orc,
             _ => return None,
         })
     }
@@ -33,8 +36,9 @@ impl Race {
 impl Into<u16> for Race {
     fn into(self) -> u16 {
         match self {
-            Self::Human => 0,
-            Self::Orc => 1,
+            Self::None => 0,
+            Self::Human => 1,
+            Self::Orc => 2,
         }
     }
 }
@@ -44,6 +48,7 @@ impl Into<protocol::Race> for Race {
         type Target = protocol::Race;
 
         match self {
+            Self::None => Target::None,
             Self::Human => Target::Human,
             Self::Orc => Target::Orc,
         }
@@ -55,6 +60,7 @@ impl Into<Race> for protocol::Race {
         type Target = Race;
 
         match self {
+            Self::None => Target::None,
             Self::Human => Target::Human,
             Self::Orc => Target::Orc,
         }

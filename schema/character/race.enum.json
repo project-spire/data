@@ -2,6 +2,7 @@
     "name": "Race",
     "base": "uint16",
     "enums": [
+        "None",
         "Human",
         "Orc"
     ],
