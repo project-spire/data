@@ -1,9 +1,12 @@
 // This is a generated file. DO NOT MODIFY.
-use std::collections::HashMap;
-use tracing::info;
-use crate::{DataId, error::Error};
+#![allow(static_mut_refs)]
 
-static WEAPON_DATA: tokio::sync::OnceCell<WeaponData> = tokio::sync::OnceCell::const_new();
+use std::collections::HashMap;
+use std::mem::MaybeUninit;
+use tracing::info;
+use crate::{DataId, error::Error, error::ParseError};
+
+static mut WEAPON_DATA: MaybeUninit<WeaponData> = MaybeUninit::uninit();
 
 #[derive(Debug)]
 pub struct Weapon {
@@ -18,11 +21,11 @@ pub struct WeaponData {
 }
 
 impl Weapon {
-    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), Error> {
+    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), ParseError> {
         const FIELDS_COUNT: usize = 4;
 
         if row.len() != FIELDS_COUNT {
-            return Err(Error::OutOfRange { expected: FIELDS_COUNT, actual: row.len() });
+            return Err(ParseError::InvalidColumnCount { expected: FIELDS_COUNT, actual: row.len() });
         }
 
         let id = crate::parse_id(&row[0])?;
@@ -47,19 +50,26 @@ impl crate::Linkable for Weapon {
 
 impl WeaponData {
     pub fn get(id: &DataId) -> Option<&'static Weapon> {
-        WEAPON_DATA.get().unwrap().data.get(&id)
+        unsafe { WEAPON_DATA.assume_init_ref() }.data.get(&id)
     }
 
     pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static Weapon)> {
-        WEAPON_DATA.get().unwrap().data.iter()
+        unsafe { WEAPON_DATA.assume_init_ref() }.data.iter()
     }
 }
 
 impl crate::Loadable for WeaponData {
     fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {
         let mut objects = HashMap::new();
+        let mut index = 2;
         for row in rows {
-            let (id, object) = Weapon::parse(row)?;
+            let (id, object) = Weapon::parse(row)
+                .map_err(|e| Error::Parse {
+                    workbook: "weapon.ods",
+                    sheet: "Weapon",
+                    row: index + 1,
+                    error: e,
+                })?;
 
             if objects.contains_key(&id) {
                 return Err(Error::DuplicateId {
@@ -69,15 +79,22 @@ impl crate::Loadable for WeaponData {
             }
 
             objects.insert(id, object);
+            
+            index += 1;
         }
 
-        if !WEAPON_DATA.set(Self { data: objects }).is_ok() {
-            return Err(Error::AlreadyLoaded {
-                type_name: std::any::type_name::<Weapon>(),
-            });
+        let data = Self { data: objects };
+        unsafe { WEAPON_DATA.write(data); }
+
+        for (id, row) in unsafe { WEAPON_DATA.assume_init_ref() }.data.iter() {
+            crate::item::EquipmentData::insert(&id, crate::item::Equipment::Weapon(row))?;
         }
 
         info!("Loaded {} rows", rows.len());
+        Ok(())
+    }
+
+    fn init() -> Result<(), Error> {
         Ok(())
     }
 }

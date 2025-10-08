@@ -15,7 +15,6 @@ use self::table::TableEntry;
 pub struct Generator {
     pub config: Config,
 
-    // pub base_module_index: Option<usize>,
     pub modules: Vec<ModuleEntry>,
     pub tables: Vec<TableEntry>,
     pub enumerations: Vec<EnumerationEntry>,
@@ -24,7 +23,6 @@ pub struct Generator {
     pub names: HashSet<String>,
     pub table_indices: HashMap<String, usize>,
     pub table_hierarchies: HashMap<usize, Vec<usize>>,
-    pub table_link_dependency_levels: Vec<Vec<usize>>,
 }
 
 impl Generator {
@@ -32,7 +30,6 @@ impl Generator {
         Self {
             config,
 
-            // base_module_index: None,
             modules: Vec::new(),
             tables: Vec::new(),
             enumerations: Vec::new(),
@@ -41,7 +38,6 @@ impl Generator {
             names: HashSet::new(),
             table_indices: HashMap::new(),
             table_hierarchies: HashMap::new(),
-            table_link_dependency_levels: Vec::new(),
         }
     }
 

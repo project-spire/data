@@ -21,7 +21,7 @@ pub enum TableSchema {
 #[derive(Debug, Deserialize)]
 pub struct ConcreteTableSchema {
     pub name: String,
-    pub data: String,
+    pub workbook: String,
     pub sheet: String,
     pub fields: Vec<Field>,
     pub extend: Option<String>,
@@ -169,13 +169,26 @@ impl Generator {
             .collect::<Vec<_>>()
             .join("\n");
 
+        let parent_insert_code = if let Some(parent) = self.get_parent_table(&schema.extend) {
+            let parent_full_name = parent.name.as_type(true);
+
+            format!(
+                "{CRATE_PREFIX}::{parent_full_name}Data::insert(&id, {CRATE_PREFIX}::{parent_full_name}::{table_type_name}(row))?;"
+            )
+        } else {
+            String::new()
+        };
+
         Ok(format!(
 r#"{GENERATED_FILE_WARNING}
-use std::collections::HashMap;
-use tracing::info;
-use {CRATE_PREFIX}::{{DataId, error::Error}};
+#![allow(static_mut_refs)]
 
-static {data_cell_name}: tokio::sync::OnceCell<{data_type_name}> = tokio::sync::OnceCell::const_new();
+use std::collections::HashMap;
+use std::mem::MaybeUninit;
+use tracing::info;
+use {CRATE_PREFIX}::{{DataId, error::Error, error::ParseError}};
+
+static mut {data_cell_name}: MaybeUninit<{data_type_name}> = MaybeUninit::uninit();
 
 #[derive(Debug)]
 pub struct {table_type_name}{lifetime_code} {{
@@ -187,11 +200,11 @@ pub struct {data_type_name}{lifetime_code} {{
 }}
 
 impl {table_type_name}{lifetime_code} {{
-    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), Error> {{
+    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), ParseError> {{
         const FIELDS_COUNT: usize = {fields_count};
 
         if row.len() != FIELDS_COUNT {{
-            return Err(Error::OutOfRange {{ expected: FIELDS_COUNT, actual: row.len() }});
+            return Err(ParseError::InvalidColumnCount {{ expected: FIELDS_COUNT, actual: row.len() }});
         }}
 
 {field_parses_code}
@@ -210,19 +223,26 @@ impl{lifetime_code} {CRATE_PREFIX}::Linkable for {table_type_name}{lifetime_para
 
 impl{lifetime_code} {data_type_name}{lifetime_parameter_code} {{
     pub fn get(id: &DataId) -> Option<&'static {table_type_name}> {{
-        {data_cell_name}.get().unwrap().data.get(&id)
+        unsafe {{ {data_cell_name}.assume_init_ref() }}.data.get(&id)
     }}
 
     pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static {table_type_name})> {{
-        {data_cell_name}.get().unwrap().data.iter()
+        unsafe {{ {data_cell_name}.assume_init_ref() }}.data.iter()
     }}
 }}
 
 impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_parameter_code} {{
     fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {{
         let mut objects = HashMap::new();
+        let mut index = {HEADER_ROWS};
         for row in rows {{
-            let (id, object) = {table_type_name}::parse(row)?;
+            let (id, object) = {table_type_name}::parse(row)
+                .map_err(|e| Error::Parse {{
+                    workbook: "{workbook}",
+                    sheet: "{sheet}",
+                    row: index + 1,
+                    error: e,
+                }})?;
 
             if objects.contains_key(&id) {{
                 return Err(Error::DuplicateId {{
@@ -232,19 +252,29 @@ impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_param
             }}
 
             objects.insert(id, object);
+            
+            index += 1;
         }}
 
-        if !{data_cell_name}.set(Self {{ data: objects }}).is_ok() {{
-            return Err(Error::AlreadyLoaded {{
-                type_name: std::any::type_name::<{table_type_name}>(),
-            }});
+        let data = Self {{ data: objects }};
+        unsafe {{ {data_cell_name}.write(data); }}
+
+        for (id, row) in unsafe {{ {data_cell_name}.assume_init_ref() }}.data.iter() {{
+            {parent_insert_code}
         }}
 
         info!("Loaded {{}} rows", rows.len());
         Ok(())
     }}
+
+    fn init() -> Result<(), Error> {{
+        Ok(())
+    }}
 }}
-"#))
+"#,
+        workbook = schema.workbook,
+        sheet = schema.sheet,
+    ))
     }
 
     fn generate_abstract_table(
@@ -280,7 +310,6 @@ impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_param
         }
 
         let parent_insert_code = if let Some(parent) = self.get_parent_table(&schema.extend) {
-            let parent_name = parent.name.as_type(false);
             let parent_full_name = parent.name.as_type(true);
 
             format!(
@@ -299,9 +328,10 @@ r#"
 #![allow(static_mut_refs)]
 
 use std::collections::HashMap;
+use std::mem::MaybeUninit;
 use {CRATE_PREFIX}::{{DataId, error::Error}};
 
-static mut {data_cell_name}: tokio::sync::OnceCell<{data_type_name}> = tokio::sync::OnceCell::const_new();
+static mut {data_cell_name}: MaybeUninit<{data_type_name}> = MaybeUninit::uninit();
 
 #[derive(Debug)]
 pub enum {table_type_name} {{
@@ -329,22 +359,22 @@ impl {CRATE_PREFIX}::Linkable for {table_type_name} {{
 
 impl {data_type_name} {{
     pub fn get(id: &DataId) -> Option<&'static {table_type_name}> {{
-        let data = unsafe {{ &{data_cell_name}.get().unwrap().data }};
+        let data = unsafe {{ &{data_cell_name}.assume_init_ref().data }};
         data.get(&id)
     }}
 
     pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static {table_type_name})> {{
-        let data = unsafe {{ &{data_cell_name}.get().unwrap().data }};
+        let data = unsafe {{ &{data_cell_name}.assume_init_ref().data }};
         data.iter()
     }}
-    
+
     pub(crate) fn init() {{
-        let data = HashMap::new();
-        unsafe {{ {data_cell_name}.set(Self {{ data }}).unwrap(); }}
+        let data = Self {{ data: HashMap::new() }};
+        unsafe {{ {data_cell_name}.write(data); }}
     }}
 
     pub(crate) fn insert(id: &DataId, row: {table_type_name}) -> Result<(), Error> {{
-        let data = unsafe {{ &mut {data_cell_name}.get_mut().unwrap().data }};
+        let data = unsafe {{ &mut {data_cell_name}.assume_init_mut().data }};
         if data.contains_key(id) {{
             return Err(Error::DuplicateId {{
                 type_name: std::any::type_name::<{table_type_name}>(),

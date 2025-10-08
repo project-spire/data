@@ -9,7 +9,7 @@ use crate::name::Name;
 use crate::error::Error;
 use crate::generator::Generator;
 
-const HEADER_ROWS: usize = 1;
+const HEADER_ROWS: usize = 2;
 const TAB: &str = "    ";
 const CRATE_PREFIX: &str = "crate";
 const GENERATED_FILE_WARNING: &str = r#"// This is a generated file. DO NOT MODIFY."#;

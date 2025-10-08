@@ -1,9 +1,12 @@
 // This is a generated file. DO NOT MODIFY.
-use std::collections::HashMap;
-use tracing::info;
-use crate::{DataId, error::Error};
+#![allow(static_mut_refs)]
 
-static RANDOM_BOX_DATA: tokio::sync::OnceCell<RandomBoxData> = tokio::sync::OnceCell::const_new();
+use std::collections::HashMap;
+use std::mem::MaybeUninit;
+use tracing::info;
+use crate::{DataId, error::Error, error::ParseError};
+
+static mut RANDOM_BOX_DATA: MaybeUninit<RandomBoxData> = MaybeUninit::uninit();
 
 #[derive(Debug)]
 pub struct RandomBox {
@@ -17,11 +20,11 @@ pub struct RandomBoxData {
 }
 
 impl RandomBox {
-    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), Error> {
+    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), ParseError> {
         const FIELDS_COUNT: usize = 3;
 
         if row.len() != FIELDS_COUNT {
-            return Err(Error::OutOfRange { expected: FIELDS_COUNT, actual: row.len() });
+            return Err(ParseError::InvalidColumnCount { expected: FIELDS_COUNT, actual: row.len() });
         }
 
         let id = crate::parse_id(&row[0])?;
@@ -44,19 +47,26 @@ impl crate::Linkable for RandomBox {
 
 impl RandomBoxData {
     pub fn get(id: &DataId) -> Option<&'static RandomBox> {
-        RANDOM_BOX_DATA.get().unwrap().data.get(&id)
+        unsafe { RANDOM_BOX_DATA.assume_init_ref() }.data.get(&id)
     }
 
     pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static RandomBox)> {
-        RANDOM_BOX_DATA.get().unwrap().data.iter()
+        unsafe { RANDOM_BOX_DATA.assume_init_ref() }.data.iter()
     }
 }
 
 impl crate::Loadable for RandomBoxData {
     fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {
         let mut objects = HashMap::new();
+        let mut index = 2;
         for row in rows {
-            let (id, object) = RandomBox::parse(row)?;
+            let (id, object) = RandomBox::parse(row)
+                .map_err(|e| Error::Parse {
+                    workbook: "random_box.ods",
+                    sheet: "RandomBox",
+                    row: index + 1,
+                    error: e,
+                })?;
 
             if objects.contains_key(&id) {
                 return Err(Error::DuplicateId {
@@ -66,15 +76,22 @@ impl crate::Loadable for RandomBoxData {
             }
 
             objects.insert(id, object);
+            
+            index += 1;
         }
 
-        if !RANDOM_BOX_DATA.set(Self { data: objects }).is_ok() {
-            return Err(Error::AlreadyLoaded {
-                type_name: std::any::type_name::<RandomBox>(),
-            });
+        let data = Self { data: objects };
+        unsafe { RANDOM_BOX_DATA.write(data); }
+
+        for (id, row) in unsafe { RANDOM_BOX_DATA.assume_init_ref() }.data.iter() {
+            crate::item::ItemData::insert(&id, crate::item::Item::RandomBox(row))?;
         }
 
         info!("Loaded {} rows", rows.len());
+        Ok(())
+    }
+
+    fn init() -> Result<(), Error> {
         Ok(())
     }
 }

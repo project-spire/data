@@ -1,9 +1,12 @@
 // This is a generated file. DO NOT MODIFY.
-use std::collections::HashMap;
-use tracing::info;
-use crate::{DataId, error::Error};
+#![allow(static_mut_refs)]
 
-static RACE_STAT_DATA: tokio::sync::OnceCell<RaceStatData> = tokio::sync::OnceCell::const_new();
+use std::collections::HashMap;
+use std::mem::MaybeUninit;
+use tracing::info;
+use crate::{DataId, error::Error, error::ParseError};
+
+static mut RACE_STAT_DATA: MaybeUninit<RaceStatData> = MaybeUninit::uninit();
 
 #[derive(Debug)]
 pub struct RaceStat {
@@ -17,11 +20,11 @@ pub struct RaceStatData {
 }
 
 impl RaceStat {
-    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), Error> {
+    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), ParseError> {
         const FIELDS_COUNT: usize = 3;
 
         if row.len() != FIELDS_COUNT {
-            return Err(Error::OutOfRange { expected: FIELDS_COUNT, actual: row.len() });
+            return Err(ParseError::InvalidColumnCount { expected: FIELDS_COUNT, actual: row.len() });
         }
 
         let id = crate::parse_id(&row[0])?;
@@ -44,19 +47,26 @@ impl crate::Linkable for RaceStat {
 
 impl RaceStatData {
     pub fn get(id: &DataId) -> Option<&'static RaceStat> {
-        RACE_STAT_DATA.get().unwrap().data.get(&id)
+        unsafe { RACE_STAT_DATA.assume_init_ref() }.data.get(&id)
     }
 
     pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static RaceStat)> {
-        RACE_STAT_DATA.get().unwrap().data.iter()
+        unsafe { RACE_STAT_DATA.assume_init_ref() }.data.iter()
     }
 }
 
 impl crate::Loadable for RaceStatData {
     fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {
         let mut objects = HashMap::new();
+        let mut index = 2;
         for row in rows {
-            let (id, object) = RaceStat::parse(row)?;
+            let (id, object) = RaceStat::parse(row)
+                .map_err(|e| Error::Parse {
+                    workbook: "race_stat.ods",
+                    sheet: "RaceStat",
+                    row: index + 1,
+                    error: e,
+                })?;
 
             if objects.contains_key(&id) {
                 return Err(Error::DuplicateId {
@@ -66,15 +76,22 @@ impl crate::Loadable for RaceStatData {
             }
 
             objects.insert(id, object);
+            
+            index += 1;
         }
 
-        if !RACE_STAT_DATA.set(Self { data: objects }).is_ok() {
-            return Err(Error::AlreadyLoaded {
-                type_name: std::any::type_name::<RaceStat>(),
-            });
+        let data = Self { data: objects };
+        unsafe { RACE_STAT_DATA.write(data); }
+
+        for (id, row) in unsafe { RACE_STAT_DATA.assume_init_ref() }.data.iter() {
+            
         }
 
         info!("Loaded {} rows", rows.len());
+        Ok(())
+    }
+
+    fn init() -> Result<(), Error> {
         Ok(())
     }
 }

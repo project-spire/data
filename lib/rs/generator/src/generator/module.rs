@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::fs;
 use crate::*;
 use crate::generator::*;
@@ -99,85 +100,124 @@ r#"{GENERATED_FILE_WARNING}
     }
 
     fn generate_table_load_code(&self) -> Result<String, Error> {
-        let mut abstract_table_loads = Vec::new();
+        let mut abstract_table_inits = Vec::new();
         for table in &self.tables {
             match &table.schema {
                 TableSchema::Concrete(_) => continue,
                 TableSchema::Abstract(_) => {},
-            }
-            let table_name = table.name.as_type(true);
+            };
 
-            abstract_table_loads.push(format!(
-                "{TAB}{table_name}Data::init();"
-            ));
-        }
-
-        let mut level_handles = Vec::new();
-        for (level, indices) in self.table_link_dependency_levels.iter().enumerate() {
-            if indices.is_empty() {
-                continue;
-            }
-
-            let mut handles = Vec::new();
-            let handles_name = format!("level_{level}_handles");
-
-            for index in indices {
-                let table = &self.tables[*index];
-                let name = &table.name;
-
-                let schema = match &table.schema {
-                    TableSchema::Concrete(schema) => schema,
-                    TableSchema::Abstract(_) => continue,
-                };
-
-                let file = name.parent_namespace().join("/")
-                    + &format!("/{}", schema.data);
-
-                handles.push((
-                    format!(
-                        "{TAB}add::<{}::{}>({}, \"{}\", &mut {});",
-                        name.parent_namespace().join("::"),
-                        name.as_data_type(),
-                        format!("data_dir.join(\"{}\")", file),
-                        schema.sheet,
-                        handles_name,
-                    ),
-                    file,
-                ));
-            }
-
-            handles.sort_by(|(_, a), (_, b)| a.cmp(b));
-            let handles: Vec<&str> = handles.
-                iter()
-                .map(|(code, _)| code.as_str())
-                .collect();
-
-            let handles_code = handles.join("\n");
-            let code = format!(
-r#"    let mut {handles_name} = Vec::new();
-{handles_code}
-
-    join({handles_name}).await?;"#
+            abstract_table_inits.push(
+                format!(
+                    "{TAB}{}Data::init();",
+                    table.name.as_type(true),
+                )
             );
-            level_handles.push(code);
         }
+
+        let mut concrete_table_loads = Vec::new();
+        for table in &self.tables {
+            let schema = match &table.schema {
+                TableSchema::Concrete(schema) => schema,
+                TableSchema::Abstract(_) => continue,
+            };
+
+            let file = table.name.parent_namespace().join("/")
+                + &format!("/{}", schema.workbook);
+
+            concrete_table_loads.push(
+                format!(
+                    "{TAB}load::<{}::{}>({}, \"{}\", &mut load_tasks);",
+                    table.name.parent_namespace().join("::"),
+                    table.name.as_data_type(),
+                    format!("data_dir.join(\"{}\")", file),
+                    schema.sheet,
+                )
+            );
+        }
+
+        let mut concrete_table_inits = Vec::new();
+        for table in &self.tables {
+            match &table.schema {
+                TableSchema::Concrete(_) => {},
+                TableSchema::Abstract(_) => continue,
+            };
+
+            concrete_table_inits.push(
+                format!(
+                    "{TAB}init::<{}::{}>(&mut init_tasks);",
+                    table.name.parent_namespace().join("::"),
+                    table.name.as_data_type(),
+                )
+            );
+        }
+
+//         let mut level_handles = Vec::new();
+//         for (level, indices) in self.table_link_dependency_levels.iter().enumerate() {
+//             if indices.is_empty() {
+//                 continue;
+//             }
+//
+//             let mut handles = Vec::new();
+//             let handles_name = format!("level_{level}_handles");
+//
+//             for index in indices {
+//                 let table = &self.tables[*index];
+//                 let name = &table.name;
+//
+//                 let schema = match &table.schema {
+//                     TableSchema::Concrete(schema) => schema,
+//                     TableSchema::Abstract(_) => continue,
+//                 };
+//
+//                 let file = name.parent_namespace().join("/")
+//                     + &format!("/{}", schema.data);
+//
+//                 handles.push((
+//                     format!(
+//                         "{TAB}add::<{}::{}>({}, \"{}\", &mut {});",
+//                         name.parent_namespace().join("::"),
+//                         name.as_data_type(),
+//                         format!("data_dir.join(\"{}\")", file),
+//                         schema.sheet,
+//                         handles_name,
+//                     ),
+//                     file,
+//                 ));
+//             }
+//
+//             handles.sort_by(|(_, a), (_, b)| a.cmp(b));
+//             let handles: Vec<&str> = handles.
+//                 iter()
+//                 .map(|(code, _)| code.as_str())
+//                 .collect();
+//
+//             let handles_code = handles.join("\n");
+//             let code = format!(
+// r#"    let mut {handles_name} = Vec::new();
+// {handles_code}
+//
+//     join({handles_name}).await?;"#
+//             );
+//             level_handles.push(code);
+//         }
 
         Ok(format!(
-r#"
+            r#"
 use calamine::Reader;
 use crate::error::Error;
 
 pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), Error> {{
-    type HandleType = tokio::task::JoinHandle<Result<(), Error>>;
+    type TaskType = tokio::task::JoinHandle<Result<(), Error>>;
 
-    fn add<T: {CRATE_PREFIX}::Loadable>(
+    fn load<T: {CRATE_PREFIX}::Loadable>(
         file: std::path::PathBuf,
         sheet: &str,
-        handles: &mut Vec<HandleType>,
+        tasks: &mut Vec<TaskType>,
     ) {{
         let sheet = sheet.to_owned();
 
-        handles.push(tokio::task::spawn(async move {{
+        tasks.push(tokio::task::spawn(async move {{
             let mut workbook: calamine::Ods<_> = calamine::open_workbook(file)?;
             let sheet = workbook
                 .with_header_row(calamine::HeaderRow::Row({HEADER_ROWS}))
@@ -188,26 +228,46 @@ pub async fn load_all(data_dir: &std::path::PathBuf) -> Result<(), Error> {{
         }}));
     }}
 
-    async fn join(handles: Vec<HandleType>) -> Result<(), Error> {{
-        for handle in handles {{
-            match handle.await {{
-                Ok(result) => result?,
-                _  => panic!("Data loading task has failed!"),
-            }}
-        }}
-
-        Ok(())
+    fn init<T: {CRATE_PREFIX}::Loadable>(
+        tasks: &mut Vec<TaskType>,
+    ) {{
+        tasks.push(tokio::task::spawn(async move {{
+            T::init()?;
+            Ok(())
+        }}));
     }}
 
-{abstract_table_loads_code}
+    // Initialize abstract tables
+{abstract_table_inits_code}
 
-{level_handles_code}
+    // Load concrete tables asynchronously
+    let mut load_tasks = Vec::new();
+{concrete_table_loads_code}
+
+    for task in load_tasks {{
+        match task.await {{
+            Ok(result) => result?,
+            _  => panic!("Data loading task has failed!"),
+        }}
+    }}
+
+    // Initialize concrete tables asynchronously
+    let mut init_tasks = Vec::new();
+{concrete_table_inits_code}
+
+    for task in init_tasks {{
+        match task.await {{
+            Ok(result) => result?,
+            _  => panic!("Data initializing task has failed!"),
+        }}
+    }}
 
     Ok(())
 }}
 "#,
-            abstract_table_loads_code = abstract_table_loads.join("\n"),
-            level_handles_code = level_handles.join("\n"),
+            abstract_table_inits_code = abstract_table_inits.join("\n"),
+            concrete_table_loads_code = concrete_table_loads.join("\n"),
+            concrete_table_inits_code = concrete_table_inits.join("\n"),
         ))
     }
 }

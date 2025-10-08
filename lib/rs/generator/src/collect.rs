@@ -27,7 +27,6 @@ impl Generator {
         }
 
         self.build_table_hierarchies()?;
-        self.build_table_link_dependency_levels()?;
 
         Ok(())
     }
@@ -188,79 +187,6 @@ impl Generator {
                 .push(index);
         }
         
-        Ok(())
-    }
-
-    fn build_table_link_dependency_levels(&mut self) -> Result<(), Error> {
-        // 1. Build graph
-        let mut graph: HashMap<usize, Vec<usize>> = HashMap::new();
-        for (index, table) in self.tables.iter().enumerate() {
-            graph.insert(index, Vec::new());
-
-            let fields = self.get_table_all_fields(table.schema.schematic())?;
-            for field in fields {
-                let link_type = match &field.kind {
-                    FieldKind::Link { link_type } => link_type,
-                    _ => continue,
-                };
-
-                let target_index = match self.table_indices.get(link_type) {
-                    Some(index) => *index,
-                    None => {
-                        return Err(Error::UnknownType(link_type.clone()));
-                    },
-                };
-
-                graph.get_mut(&index).unwrap().push(target_index);
-            }
-        }
-
-        // 2. Build in-degrees
-        let mut in_degrees: HashMap<usize, usize> = graph
-            .iter()
-            .map(|(node, _)| (*node, 0))
-            .collect();
-
-        for nodes in graph.values() {
-            for node in nodes {
-                *in_degrees.get_mut(node).unwrap() += 1;
-            }
-        }
-
-        // 3. Sort topologically (Khan's Algorithm)
-        let mut queue: VecDeque<usize> = in_degrees
-            .iter()
-            .filter(|&(_, &degree)| degree == 0)
-            .map(|(node, _)| *node)
-            .collect();
-        let mut sorted_count = 0;
-
-        while !queue.is_empty() {
-            let level_size = queue.len();
-            let mut current_level = Vec::with_capacity(level_size);
-
-            for _ in 0..level_size {
-                let u = queue.pop_front().unwrap();
-                for v in graph.get(&u).unwrap() {
-                    let degree = in_degrees.get_mut(v).unwrap();
-                    *degree -= 1;
-
-                    if *degree == 0 {
-                        queue.push_back(*v);
-                    }
-                }
-
-                current_level.push(u);
-                sorted_count += 1;
-            }
-            self.table_link_dependency_levels.push(current_level);
-        }
-
-        // Cycle detected
-        if sorted_count != graph.len() {
-            return Err(Error::CircularDependency)
-        }
-
         Ok(())
     }
 }

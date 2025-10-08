@@ -2,7 +2,7 @@
     "name": "RandomBox",
     "type": "concrete",
     "extend": "item::Item",
-    "data": "random_box.ods",
+    "workbook": "random_box.ods",
     "sheet": "RandomBox",
     "fields": [
         {

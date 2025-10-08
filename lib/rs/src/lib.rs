@@ -5,8 +5,9 @@ pub(crate) use parse::*;
 mod parse;
 mod error;
 
-use std::ops::Deref;
 use std::fmt::Formatter;
+use std::mem::MaybeUninit;
+use std::ops::Deref;
 use std::str::FromStr;
 use crate::error::Error;
 
@@ -14,17 +15,18 @@ use crate::error::Error;
 pub struct DataId(u32);
 
 #[derive(Debug)]
-pub struct Link<'a, T> {
+pub struct Link<'a, T: Linkable> {
     id: DataId,
-    target: &'a T,
+    target: MaybeUninit<&'a T>,
 }
 
 pub trait Linkable: Sized {
     fn get(id: &DataId) -> Option<&'static Self>;
 }
 
-pub trait Loadable: Sized {
+pub(crate) trait Loadable: Sized {
     fn load(rows: &[&[calamine::Data]]) -> Result<(), Error>;
+    fn init() -> Result<(), Error>;
 }
 
 impl std::fmt::Display for DataId {
@@ -50,10 +52,25 @@ impl FromStr for DataId {
     }
 }
 
-impl<'a, T> Deref for Link<'a, T> {
+impl<'a, T: Linkable> Deref for Link<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        self.target
+        unsafe { self.target.assume_init_ref() }
+    }
+}
+
+impl<'a, T: Linkable + 'static> Link<'a, T> {
+    pub(crate) fn init(&mut self) -> Result<(), Error> {
+        let target = match T::get(&self.id) {
+            Some(target) => target,
+            None => return Err(Error::MissingLink {
+                type_name: std::any::type_name::<T>(),
+                id: self.id,
+            }),
+        };
+
+        self.target.write(target);
+        Ok(())
     }
 }

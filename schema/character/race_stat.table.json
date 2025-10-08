@@ -1,7 +1,7 @@
 {
     "name": "RaceStat",
     "type": "concrete",
-    "data": "race_stat.ods",
+    "workbook": "race_stat.ods",
     "sheet": "RaceStat",
     "fields": [
         {

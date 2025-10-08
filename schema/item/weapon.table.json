@@ -2,7 +2,7 @@
     "name": "Weapon",
     "type": "concrete",
     "extend": "item::Equipment",
-    "data": "weapon.ods",
+    "workbook": "weapon.ods",
     "sheet": "Weapon",
     "fields": [
         {

@@ -2,9 +2,10 @@
 #![allow(static_mut_refs)]
 
 use std::collections::HashMap;
+use std::mem::MaybeUninit;
 use crate::{DataId, error::Error};
 
-static mut EQUIPMENT_DATA: tokio::sync::OnceCell<EquipmentData> = tokio::sync::OnceCell::const_new();
+static mut EQUIPMENT_DATA: MaybeUninit<EquipmentData> = MaybeUninit::uninit();
 
 #[derive(Debug)]
 pub enum Equipment {
@@ -32,22 +33,22 @@ impl crate::Linkable for Equipment {
 
 impl EquipmentData {
     pub fn get(id: &DataId) -> Option<&'static Equipment> {
-        let data = unsafe { &EQUIPMENT_DATA.get().unwrap().data };
+        let data = unsafe { &EQUIPMENT_DATA.assume_init_ref().data };
         data.get(&id)
     }
 
     pub fn iter() -> impl Iterator<Item = (&'static DataId, &'static Equipment)> {
-        let data = unsafe { &EQUIPMENT_DATA.get().unwrap().data };
+        let data = unsafe { &EQUIPMENT_DATA.assume_init_ref().data };
         data.iter()
     }
-    
+
     pub(crate) fn init() {
-        let data = HashMap::new();
-        unsafe { EQUIPMENT_DATA.set(Self { data }).unwrap(); }
+        let data = Self { data: HashMap::new() };
+        unsafe { EQUIPMENT_DATA.write(data); }
     }
 
     pub(crate) fn insert(id: &DataId, row: Equipment) -> Result<(), Error> {
-        let data = unsafe { &mut EQUIPMENT_DATA.get_mut().unwrap().data };
+        let data = unsafe { &mut EQUIPMENT_DATA.assume_init_mut().data };
         if data.contains_key(id) {
             return Err(Error::DuplicateId {
                 type_name: std::any::type_name::<Equipment>(),
