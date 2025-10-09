@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::mem::MaybeUninit;
+use tokio::sync::Mutex;
 use crate::{DataId, error::Error};
 
 static mut EQUIPMENT_DATA: MaybeUninit<EquipmentData> = MaybeUninit::uninit();
@@ -47,17 +48,23 @@ impl EquipmentData {
         unsafe { EQUIPMENT_DATA.write(data); }
     }
 
-    pub(crate) fn insert(id: &DataId, row: Equipment) -> Result<(), Error> {
+    pub(crate) async fn insert(id: &DataId, row: Equipment) -> Result<(), Error> {
+        static LOCK: Mutex<()> = Mutex::const_new(());
+
         let data = unsafe { &mut EQUIPMENT_DATA.assume_init_mut().data };
+        let _ = LOCK.lock().await;
+
         if data.contains_key(id) {
             return Err(Error::DuplicateId {
                 type_name: std::any::type_name::<Equipment>(),
                 id: *id,
+                a: format!("{:?}", data[id]),
+                b: format!("{:?}", row)
             });
         }
         data.insert(*id, row);
 
-        crate::item::ItemData::insert(id, crate::item::Item::Equipment(&data[id]))?;
+        crate::item::ItemData::insert(id, crate::item::Item::Equipment(&data[id])).await?;
 
         Ok(())
     }

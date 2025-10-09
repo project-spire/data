@@ -25,7 +25,7 @@ pub trait Linkable: Sized {
 }
 
 pub(crate) trait Loadable: Sized {
-    fn load(rows: &[&[calamine::Data]]) -> Result<(), Error>;
+    fn load(rows: &[&[calamine::Data]]) -> impl Future<Output = Result<(), Error>> + Send;
     fn init() -> Result<(), Error>;
 }
 

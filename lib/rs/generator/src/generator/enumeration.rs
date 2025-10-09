@@ -82,7 +82,7 @@ impl Generator {
 
         Ok(format!(
             r#"{GENERATED_FILE_WARNING}
-use crate::error::Error;
+use crate::error::ParseError;
 
 {attributes_code}
 pub enum {enum_type_name} {{
@@ -90,14 +90,15 @@ pub enum {enum_type_name} {{
 }}
 
 impl {enum_type_name} {{
-    pub fn parse(value: &calamine::Data) -> Result<Self, Error> {{
+    pub fn parse(value: &calamine::Data) -> Result<Self, ParseError> {{
         let enum_string = {CRATE_PREFIX}::parse_string(value)?;
 
         Ok(match enum_string.as_str() {{
 {enum_parses_code}
-            _ => return Err(Error::Parse(format!(
-                "Invalid value \"{{enum_string}}\" for {enum_type_name}"
-            ))),
+            _ => return Err(ParseError::InvalidValue {{
+                type_name: std::any::type_name::<{enum_type_name}>(),
+                value: enum_string,
+            }}),
         }})
     }}
 

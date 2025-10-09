@@ -141,7 +141,7 @@ impl Generator {
             field_names.push(field.name.clone());
             field_definitions.push(format!("{TAB}pub {}: {},", field.name, field.kind.to_rust_type()));
             field_parses.push(format!(
-                "{TAB}{TAB}let {field_name} = {parse_function}(&row[{index}])?;",
+                "{TAB}{TAB}let {field_name} = {parse_function}(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;",
                 field_name = field.name,
                 parse_function = field.kind.to_parse_code(),
             ));
@@ -173,7 +173,7 @@ impl Generator {
             let parent_full_name = parent.name.as_type(true);
 
             format!(
-                "{CRATE_PREFIX}::{parent_full_name}Data::insert(&id, {CRATE_PREFIX}::{parent_full_name}::{table_type_name}(row))?;"
+                "{CRATE_PREFIX}::{parent_full_name}Data::insert(&id, {CRATE_PREFIX}::{parent_full_name}::{table_type_name}(row)).await?;"
             )
         } else {
             String::new()
@@ -200,11 +200,11 @@ pub struct {data_type_name}{lifetime_code} {{
 }}
 
 impl {table_type_name}{lifetime_code} {{
-    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), ParseError> {{
+    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), (&'static str, ParseError)> {{
         const FIELDS_COUNT: usize = {fields_count};
 
         if row.len() != FIELDS_COUNT {{
-            return Err(ParseError::InvalidColumnCount {{ expected: FIELDS_COUNT, actual: row.len() }});
+            return Err(("", ParseError::InvalidColumnCount {{ expected: FIELDS_COUNT, actual: row.len() }}));
         }}
 
 {field_parses_code}
@@ -232,22 +232,25 @@ impl{lifetime_code} {data_type_name}{lifetime_parameter_code} {{
 }}
 
 impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_parameter_code} {{
-    fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {{
+    async fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {{
         let mut objects = HashMap::new();
         let mut index = {HEADER_ROWS};
         for row in rows {{
             let (id, object) = {table_type_name}::parse(row)
-                .map_err(|e| Error::Parse {{
+                .map_err(|(column, error)| Error::Parse {{
                     workbook: "{workbook}",
                     sheet: "{sheet}",
                     row: index + 1,
-                    error: e,
+                    column,
+                    error,
                 }})?;
 
             if objects.contains_key(&id) {{
                 return Err(Error::DuplicateId {{
                     type_name: std::any::type_name::<{table_type_name}>(),
                     id,
+                    a: format!("{{:?}}", objects[&id]),
+                    b: format!("{{:?}}", object),
                 }});
             }}
 
@@ -315,7 +318,7 @@ impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_param
             format!(
 r#"
 
-        {CRATE_PREFIX}::{parent_full_name}Data::insert(id, {CRATE_PREFIX}::{parent_full_name}::{table_type_name}(&data[id]))?;"#
+        {CRATE_PREFIX}::{parent_full_name}Data::insert(id, {CRATE_PREFIX}::{parent_full_name}::{table_type_name}(&data[id])).await?;"#
             )
         } else {
             String::new()
@@ -329,6 +332,7 @@ r#"
 
 use std::collections::HashMap;
 use std::mem::MaybeUninit;
+use tokio::sync::Mutex;
 use {CRATE_PREFIX}::{{DataId, error::Error}};
 
 static mut {data_cell_name}: MaybeUninit<{data_type_name}> = MaybeUninit::uninit();
@@ -373,12 +377,18 @@ impl {data_type_name} {{
         unsafe {{ {data_cell_name}.write(data); }}
     }}
 
-    pub(crate) fn insert(id: &DataId, row: {table_type_name}) -> Result<(), Error> {{
+    pub(crate) async fn insert(id: &DataId, row: {table_type_name}) -> Result<(), Error> {{
+        static LOCK: Mutex<()> = Mutex::const_new(());
+
         let data = unsafe {{ &mut {data_cell_name}.assume_init_mut().data }};
+        let _ = LOCK.lock().await;
+
         if data.contains_key(id) {{
             return Err(Error::DuplicateId {{
                 type_name: std::any::type_name::<{table_type_name}>(),
                 id: *id,
+                a: format!("{{:?}}", data[id]),
+                b: format!("{{:?}}", row)
             }});
         }}
         data.insert(*id, row);{parent_insert_code}

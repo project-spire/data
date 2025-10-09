@@ -20,16 +20,16 @@ pub struct RandomBoxData {
 }
 
 impl RandomBox {
-    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), ParseError> {
+    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), (&'static str, ParseError)> {
         const FIELDS_COUNT: usize = 3;
 
         if row.len() != FIELDS_COUNT {
-            return Err(ParseError::InvalidColumnCount { expected: FIELDS_COUNT, actual: row.len() });
+            return Err(("", ParseError::InvalidColumnCount { expected: FIELDS_COUNT, actual: row.len() }));
         }
 
-        let id = crate::parse_id(&row[0])?;
-        let name = crate::parse_string(&row[1])?;
-        let items = crate::parse_tuple_2::<crate::Link<'static, crate::item::Item>, u16>(&row[2])?;
+        let id = crate::parse_id(&row[0]).map_err(|e| ("id", e))?;
+        let name = crate::parse_string(&row[1]).map_err(|e| ("name", e))?;
+        let items = crate::parse_tuple_2::<crate::Link<'static, crate::item::Item>, u16>(&row[2]).map_err(|e| ("items", e))?;
 
         Ok((id, Self {
             id,
@@ -56,22 +56,25 @@ impl RandomBoxData {
 }
 
 impl crate::Loadable for RandomBoxData {
-    fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {
+    async fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {
         let mut objects = HashMap::new();
         let mut index = 2;
         for row in rows {
             let (id, object) = RandomBox::parse(row)
-                .map_err(|e| Error::Parse {
+                .map_err(|(column, error)| Error::Parse {
                     workbook: "random_box.ods",
                     sheet: "RandomBox",
                     row: index + 1,
-                    error: e,
+                    column,
+                    error,
                 })?;
 
             if objects.contains_key(&id) {
                 return Err(Error::DuplicateId {
                     type_name: std::any::type_name::<RandomBox>(),
                     id,
+                    a: format!("{:?}", objects[&id]),
+                    b: format!("{:?}", object),
                 });
             }
 
@@ -84,7 +87,7 @@ impl crate::Loadable for RandomBoxData {
         unsafe { RANDOM_BOX_DATA.write(data); }
 
         for (id, row) in unsafe { RANDOM_BOX_DATA.assume_init_ref() }.data.iter() {
-            crate::item::ItemData::insert(&id, crate::item::Item::RandomBox(row))?;
+            crate::item::ItemData::insert(&id, crate::item::Item::RandomBox(row)).await?;
         }
 
         info!("Loaded {} rows", rows.len());

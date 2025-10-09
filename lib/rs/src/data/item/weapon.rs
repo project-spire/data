@@ -21,17 +21,17 @@ pub struct WeaponData {
 }
 
 impl Weapon {
-    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), ParseError> {
+    fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), (&'static str, ParseError)> {
         const FIELDS_COUNT: usize = 4;
 
         if row.len() != FIELDS_COUNT {
-            return Err(ParseError::InvalidColumnCount { expected: FIELDS_COUNT, actual: row.len() });
+            return Err(("", ParseError::InvalidColumnCount { expected: FIELDS_COUNT, actual: row.len() }));
         }
 
-        let id = crate::parse_id(&row[0])?;
-        let name = crate::parse_string(&row[1])?;
-        let weight = crate::parse_u16(&row[2])?;
-        let damage = crate::parse_u32(&row[3])?;
+        let id = crate::parse_id(&row[0]).map_err(|e| ("id", e))?;
+        let name = crate::parse_string(&row[1]).map_err(|e| ("name", e))?;
+        let weight = crate::parse_u16(&row[2]).map_err(|e| ("weight", e))?;
+        let damage = crate::parse_u32(&row[3]).map_err(|e| ("damage", e))?;
 
         Ok((id, Self {
             id,
@@ -59,22 +59,25 @@ impl WeaponData {
 }
 
 impl crate::Loadable for WeaponData {
-    fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {
+    async fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {
         let mut objects = HashMap::new();
         let mut index = 2;
         for row in rows {
             let (id, object) = Weapon::parse(row)
-                .map_err(|e| Error::Parse {
+                .map_err(|(column, error)| Error::Parse {
                     workbook: "weapon.ods",
                     sheet: "Weapon",
                     row: index + 1,
-                    error: e,
+                    column,
+                    error,
                 })?;
 
             if objects.contains_key(&id) {
                 return Err(Error::DuplicateId {
                     type_name: std::any::type_name::<Weapon>(),
                     id,
+                    a: format!("{:?}", objects[&id]),
+                    b: format!("{:?}", object),
                 });
             }
 
@@ -87,7 +90,7 @@ impl crate::Loadable for WeaponData {
         unsafe { WEAPON_DATA.write(data); }
 
         for (id, row) in unsafe { WEAPON_DATA.assume_init_ref() }.data.iter() {
-            crate::item::EquipmentData::insert(&id, crate::item::Equipment::Weapon(row))?;
+            crate::item::EquipmentData::insert(&id, crate::item::Equipment::Weapon(row)).await?;
         }
 
         info!("Loaded {} rows", rows.len());

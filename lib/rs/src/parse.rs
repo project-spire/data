@@ -10,132 +10,74 @@ pub(crate) trait Parsable: Sized {
 }
 
 pub(crate) fn parse_id(value: &calamine::Data) -> Result<DataId, ParseError> {
-    let i = match value.as_i64() {
-        Some(i) => i,
-        None => return Err(ParseError::InvalidFormat {
-            type_name: std::any::type_name::<DataId>(),
-            expected: "i64",
-            actual: value.to_string(),
-        }),
-    };
-
-    if i < u32::MIN as i64 || i > u32::MAX as i64 {
-        return Err(ParseError::Parse(format!("{} is out of Id range", value.to_string())));
-    }
+    let i = to_integer::<DataId>(value)?;
+    check_range(i, u32::MIN, u32::MAX)?;
 
     Ok(DataId(i as u32))
 }
 
 pub(crate) fn parse_i8(value: &calamine::Data) -> Result<i8, ParseError> {
-    let i = match value.as_i64() {
-        Some(i) => i,
-        None => return Err(ParseError::Parse(format!("{} is not i8", value.to_string()))),
-    };
-
-    if i < i8::MIN as i64 || i > i8::MAX as i64 {
-        return Err(ParseError::Parse(format!("{} is out of i8 range", value.to_string())));
-    }
+    let i = to_integer::<i8>(value)?;
+    check_range(i, i8::MIN, i8::MAX)?;
 
     Ok(i as i8)
 }
 
 pub(crate) fn parse_i16(value: &calamine::Data) -> Result<i16, ParseError> {
-    let i = match value.as_i64() {
-        Some(i) => i,
-        None => return Err(ParseError::Parse(format!("{} is not i16", value.to_string()))),
-    };
-
-    if i < i16::MIN as i64 || i > i16::MAX as i64 {
-        return Err(ParseError::Parse(format!("{} is out of i16 range", value.to_string())));
-    }
+    let i = to_integer::<i16>(value)?;
+    check_range(i, i16::MIN, i16::MAX)?;
 
     Ok(i as i16)
 }
 
 pub(crate) fn parse_i32(value: &calamine::Data) -> Result<i32, ParseError> {
-    let i = match value.as_i64() {
-        Some(i) => i,
-        None => return Err(ParseError::Parse(format!("{} is not i32", value.to_string()))),
-    };
-
-    if i < i32::MIN as i64 || i > i32::MAX as i64 {
-        return Err(ParseError::Parse(format!("{} is out of i32 range", value.to_string())));
-    }
+    let i = to_integer::<i32>(value)?;
+    check_range(i, i32::MIN, i32::MAX)?;
 
     Ok(i as i32)
 }
 
 pub(crate) fn parse_i64(value: &calamine::Data) -> Result<i64, ParseError> {
-    let i = match value.as_i64() {
-        Some(i) => i,
-        None => return Err(ParseError::Parse(format!("{} is not i64", value.to_string()))),
-    };
+    let i = to_integer::<i64>(value)?;
 
     Ok(i)
 }
 
 pub(crate) fn parse_u8(value: &calamine::Data) -> Result<u8, ParseError> {
-    let i = match value.as_i64() {
-        Some(i) => i,
-        None => return Err(ParseError::Parse(format!("{} is not u8", value.to_string()))),
-    };
-
-    if i < u8::MIN as i64 || i > u8::MAX as i64 {
-        return Err(ParseError::Parse(format!("{} is out of u8 range", value.to_string())));
-    }
+    let i = to_integer::<u8>(value)?;
+    check_range(i, u8::MIN, u8::MAX)?;
 
     Ok(i as u8)
 }
 
 pub(crate) fn parse_u16(value: &calamine::Data) -> Result<u16, ParseError> {
-    let i = match value.as_i64() {
-        Some(i) => i,
-        None => return Err(ParseError::Parse(format!("{} is not u16", value.to_string()))),
-    };
-
-    if i < u16::MIN as i64 || i > u16::MAX as i64 {
-        return Err(ParseError::Parse(format!("{} is out of u16 range", value.to_string())));
-    }
+    let i = to_integer::<u16>(value)?;
+    check_range(i, u16::MIN, u16::MAX)?;
 
     Ok(i as u16)
 }
 
 pub(crate) fn parse_u32(value: &calamine::Data) -> Result<u32, ParseError> {
-    let i = match value.as_i64() {
-        Some(i) => i,
-        None => return Err(ParseError::Parse(format!("{} is not u32", value.to_string()))),
-    };
-
-    if i < u32::MIN as i64 || i > u32::MAX as i64 {
-        return Err(ParseError::Parse(format!("{} is out of u32 range", value.to_string())));
-    }
+    let i = to_integer::<u32>(value)?;
+    check_range(i, u32::MIN, u32::MAX)?;
 
     Ok(i as u32)
 }
 
 pub(crate) fn parse_u64(value: &calamine::Data) -> Result<u64, ParseError> {
-    let i = match value.as_i64() {
-        Some(i) => i,
-        None => return Err(ParseError::Parse(format!("{} is not u64", value.to_string()))),
-    };
+    let i = to_integer::<u64>(value)?;
 
     Ok(i as u64)
 }
 
 pub(crate) fn parse_f32(value: &calamine::Data) -> Result<f32, ParseError> {
-    let f = match value.get_float() {
-        Some(f) => f,
-        None => return Err(ParseError::Parse(format!("{} is not f32", value.to_string()))),
-    };
+    let f = to_float::<f32>(value)?;
 
     Ok(f as f32)
 }
 
 pub fn parse_f64(value: &calamine::Data) -> Result<f64, ParseError> {
-    let f = match value.get_float() {
-        Some(f) => f,
-        None => return Err(ParseError::Parse(format!("{} is not f64", value.to_string()))),
-    };
+    let f = to_float::<f64>(value)?;
 
     Ok(f)
 }
@@ -143,7 +85,11 @@ pub fn parse_f64(value: &calamine::Data) -> Result<f64, ParseError> {
 pub(crate) fn parse_string(value: &calamine::Data) -> Result<String, ParseError> {
     let s = match value.get_string() {
         Some(s) => s,
-        None => return Err(ParseError::Parse(format!("{} is not String", value.to_string()))),
+        None => return Err(ParseError::InvalidFormat {
+            type_name: std::any::type_name::<String>(),
+            expected: "string",
+            actual: value.to_string(),
+        }),
     };
 
     Ok(s.trim().to_owned())
@@ -151,10 +97,6 @@ pub(crate) fn parse_string(value: &calamine::Data) -> Result<String, ParseError>
 
 pub(crate) fn parse_link<'a, T: 'static + Linkable>(value: &calamine::Data) -> Result<Link<'a, T>, ParseError> {
     let id = parse_id(value)?;
-    // let target = T::get(&id).ok_or_else(|| ParseError::MissingLink {
-    //     type_name: std::any::type_name::<T>(),
-    //     id,
-    // })?;
     let target = MaybeUninit::uninit();
 
     Ok(Link { id, target })
@@ -208,28 +150,90 @@ where
 fn parse_tuple(value: &calamine::Data, count: usize) -> Result<Vec<&str>, ParseError> {
     let s = match value.get_string() {
         Some(s) => s.trim(),
-        None => return Err(ParseError::Parse(format!("{} is not a tuple string", value.to_string()))),
+        None => return Err(ParseError::InvalidFormat {
+            type_name: "tuple",
+            expected: "string",
+            actual: value.to_string(),
+        }),
     };
 
     if s.len() < 2
         || s.chars().nth(0).unwrap() != '('
         || s.chars().nth_back(0).unwrap() != ')' {
-        return Err(ParseError::Parse(format!("{} has an invalid tuple form", value)));
+        return Err(ParseError::InvalidFormat {
+            type_name: "tuple",
+            expected: "(a, b, c, ...)",
+            actual: value.to_string(),
+        });
     }
 
-    let v: Vec<&str> = s.split(", ").collect();
+    let v: Vec<&str> = s[1..s.len() - 1]
+        .split(",")
+        .map(|item| item.trim())
+        .filter(|item| !item.is_empty())
+        .collect();
     if v.len() != count {
-        return Err(ParseError::Parse(format!("{} does not match tuple count {}", value, count)));
+        return Err(ParseError::InvalidItemCount {
+            type_name: "tuple",
+            expected: count,
+            actual: v.len(),
+        });
     }
 
     Ok(v)
+}
+
+fn to_integer<T>(value: &calamine::Data) -> Result<i64, ParseError> {
+    match value.as_i64() {
+        Some(i) => Ok(i),
+        None => Err(ParseError::InvalidFormat {
+            type_name: std::any::type_name::<T>(),
+            expected: "integer",
+            actual: value.to_string(),
+        }),
+    }
+}
+
+fn string_to_integer<T: FromStr>(s: &str) -> Result<T, ParseError> {
+    let i = T::from_str(s).map_err(|_| ParseError::InvalidFormat {
+        type_name: std::any::type_name::<T>(),
+        expected: "integer",
+        actual: s.to_string(),
+    })?;
+
+    Ok(i)
+}
+
+fn to_float<T>(value: &calamine::Data) -> Result<f64, ParseError> {
+    match value.get_float() {
+        Some(f) => Ok(f),
+        None => Err(ParseError::InvalidFormat {
+            type_name: std::any::type_name::<T>(),
+            expected: "float",
+            actual: value.to_string(),
+        }),
+    }
+}
+
+fn check_range<T: Into<i64>>(value: i64, min: T, max: T) -> Result<(), ParseError> {
+    let (min, max) = (min.into(), max.into());
+    if min <= value && value <= max {
+        return Ok(())
+    }
+
+    Err(ParseError::OutOfRange {
+        type_name: std::any::type_name::<T>(),
+        min,
+        max,
+        value,
+    })
 }
 
 impl Parsable for DataId {
     fn parse(value: &calamine::Data) -> Result<Self, ParseError> { parse_id(value) }
 
     fn parse_str(s: &str) -> Result<Self, ParseError> {
-        let id = u32::from_str(s).map_err(|_| ParseError::Parse(format!("{} is not a DataId", s)))?;
+        let id = string_to_integer::<u32>(s)?;
         Ok(DataId(id))
     }
 }
@@ -238,7 +242,7 @@ impl Parsable for u8 {
     fn parse(value: &calamine::Data) -> Result<Self, ParseError> { parse_u8(value) }
 
     fn parse_str(s: &str) -> Result<Self, ParseError> {
-        Ok(u8::from_str(s).map_err(|_| ParseError::Parse(format!("{} is not u8", s)))?)
+        Ok(string_to_integer::<u8>(s)?)
     }
 }
 
@@ -246,7 +250,7 @@ impl Parsable for u16 {
     fn parse(value: &calamine::Data) -> Result<Self, ParseError> { parse_u16(value) }
 
     fn parse_str(s: &str) -> Result<Self, ParseError> {
-        Ok(u16::from_str(s).map_err(|_| ParseError::Parse(format!("{} is not u16", s)))?)
+        Ok(string_to_integer::<u16>(s)?)
     }
 }
 
@@ -254,7 +258,7 @@ impl Parsable for u32 {
     fn parse(value: &calamine::Data) -> Result<Self, ParseError> { parse_u32(value) }
 
     fn parse_str(s: &str) -> Result<Self, ParseError> {
-        Ok(u32::from_str(s).map_err(|_| ParseError::Parse(format!("{} is not u32", s)))?)
+        Ok(string_to_integer::<u32>(s)?)
     }
 }
 
@@ -262,7 +266,7 @@ impl Parsable for u64 {
     fn parse(value: &calamine::Data) -> Result<Self, ParseError> { parse_u64(value) }
 
     fn parse_str(s: &str) -> Result<Self, ParseError> {
-        Ok(u64::from_str(s).map_err(|_| ParseError::Parse(format!("{} is not u64", s)))?)
+        Ok(string_to_integer::<u64>(s)?)
     }
 }
 
@@ -270,7 +274,7 @@ impl Parsable for i8 {
     fn parse(value: &calamine::Data) -> Result<Self, ParseError> { parse_i8(value) }
 
     fn parse_str(s: &str) -> Result<Self, ParseError> {
-        Ok(i8::from_str(s).map_err(|_| ParseError::Parse(format!("{} is not i8", s)))?)
+        Ok(string_to_integer::<i8>(s)?)
     }
 }
 
@@ -278,7 +282,7 @@ impl Parsable for i16 {
     fn parse(value: &calamine::Data) -> Result<Self, ParseError> { parse_i16(value) }
 
     fn parse_str(s: &str) -> Result<Self, ParseError> {
-        Ok(i16::from_str(s).map_err(|_| ParseError::Parse(format!("{} is not i16", s)))?)
+        Ok(string_to_integer::<i16>(s)?)
     }
 }
 
@@ -286,7 +290,7 @@ impl Parsable for i32 {
     fn parse(value: &calamine::Data) -> Result<Self, ParseError> { parse_i32(value) }
 
     fn parse_str(s: &str) -> Result<Self, ParseError> {
-        Ok(i32::from_str(s).map_err(|_| ParseError::Parse(format!("{} is not i32", s)))?)
+        Ok(string_to_integer::<i32>(s)?)
     }
 }
 
@@ -294,7 +298,7 @@ impl Parsable for i64 {
     fn parse(value: &calamine::Data) -> Result<Self, ParseError> { parse_i64(value) }
 
     fn parse_str(s: &str) -> Result<Self, ParseError> {
-        Ok(i64::from_str(s).map_err(|_| ParseError::Parse(format!("{} is not i64", s)))?)
+        Ok(string_to_integer::<i64>(s)?)
     }
 }
 
@@ -303,10 +307,6 @@ impl<T: 'static + Linkable> Parsable for Link<'static, T> {
 
     fn parse_str(s: &str) -> Result<Self, ParseError> {
         let id = DataId::parse_str(s)?;
-        // let target = T::get(&id).ok_or_else(|| ParseError::MissingLink {
-        //     type_name: std::any::type_name::<T>(),
-        //     id,
-        // })?;
         let target = MaybeUninit::uninit();
 
         Ok(Link { id, target })
