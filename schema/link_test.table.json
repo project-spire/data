@@ -28,7 +28,7 @@
       "target": "all",
       "kind": "link",
       "type": "item::Item",
-      "cardinality": "multi"
+      "multi": true
     }
   ],
   "types": []

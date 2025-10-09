@@ -19,7 +19,7 @@
                     "type": "uint16"
                 }
             ],
-            "cardinality": "multi"
+            "multi": true
         }
     ],
     "types": []

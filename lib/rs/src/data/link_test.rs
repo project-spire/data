@@ -4,16 +4,16 @@
 use std::collections::HashMap;
 use std::mem::MaybeUninit;
 use tracing::info;
-use crate::{DataId, error::*};
+use crate::{DataId, Link, error::*, parse::*};
 
 static mut LINK_TEST_DATA: MaybeUninit<LinkTestData> = MaybeUninit::uninit();
 
 #[derive(Debug)]
 pub struct LinkTest {
     pub id: DataId,
-    pub item_link: crate::Link<'static, crate::item::Item>,
-    pub optional_item_link: crate::Link<'static, crate::item::Item>,
-    pub multi_item_link: crate::Link<'static, crate::item::Item>,
+    pub item_link: Link<'static, crate::item::Item>,
+    pub optional_item_link: Option<Link<'static, crate::item::Item>>,
+    pub multi_item_link: Vec<Link<'static, crate::item::Item>>,
 }
 
 pub struct LinkTestData {
@@ -28,10 +28,10 @@ impl LinkTest {
             return Err(("", ParseError::InvalidColumnCount { expected: FIELDS_COUNT, actual: row.len() }));
         }
 
-        let id = crate::parse_id(&row[0]).map_err(|e| ("id", e))?;
-        let item_link = crate::parse_link::<crate::item::Item>(&row[1]).map_err(|e| ("item_link", e))?;
-        let optional_item_link = crate::parse_link::<crate::item::Item>(&row[2]).map_err(|e| ("optional_item_link", e))?;
-        let multi_item_link = crate::parse_link::<crate::item::Item>(&row[3]).map_err(|e| ("multi_item_link", e))?;
+        let id = parse(&row[0]).map_err(|e| ("id", e))?;
+        let item_link = parse(&row[1]).map_err(|e| ("item_link", e))?;
+        let optional_item_link = parse_optional(&row[2]).map_err(|e| ("optional_item_link", e))?;
+        let multi_item_link = parse_multi(&row[3]).map_err(|e| ("multi_item_link", e))?;
 
         Ok((id, Self {
             id,
@@ -111,7 +111,6 @@ impl crate::Loadable for LinkTestData {
                 id,
                 error,
             })?;
-
 
         Ok(())
     }

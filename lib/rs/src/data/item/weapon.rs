@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::mem::MaybeUninit;
 use tracing::info;
-use crate::{DataId, error::*};
+use crate::{DataId, Link, error::*, parse::*};
 
 static mut WEAPON_DATA: MaybeUninit<WeaponData> = MaybeUninit::uninit();
 
@@ -28,10 +28,10 @@ impl Weapon {
             return Err(("", ParseError::InvalidColumnCount { expected: FIELDS_COUNT, actual: row.len() }));
         }
 
-        let id = crate::parse_id(&row[0]).map_err(|e| ("id", e))?;
-        let name = crate::parse_string(&row[1]).map_err(|e| ("name", e))?;
-        let weight = crate::parse_u16(&row[2]).map_err(|e| ("weight", e))?;
-        let damage = crate::parse_u32(&row[3]).map_err(|e| ("damage", e))?;
+        let id = parse(&row[0]).map_err(|e| ("id", e))?;
+        let name = parse(&row[1]).map_err(|e| ("name", e))?;
+        let weight = parse(&row[2]).map_err(|e| ("weight", e))?;
+        let damage = parse(&row[3]).map_err(|e| ("damage", e))?;
 
         Ok((id, Self {
             id,

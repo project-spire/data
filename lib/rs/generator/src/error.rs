@@ -1,5 +1,3 @@
-use std::fmt::Formatter;
-
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("IO error: {0}")]
@@ -17,12 +15,12 @@ pub enum Error {
     #[error("Unknown type: {0}")]
     UnknownType(String),
 
-    #[error("Circular dependency detected")]
-    CircularDependency,
-
     #[error("Collect error: {0}")]
     Collect(String),
 
     #[error("Inheritance error: {0} -> {1}")]
     Inheritance(String, String),
+    
+    #[error("Invalid attribute: {0}")]
+    InvalidAttribute(String),
 }

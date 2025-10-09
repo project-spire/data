@@ -46,7 +46,7 @@ pub struct Field {
     #[serde(flatten)] pub kind: FieldKind,
     // #[serde(default)] pub desc: Option<String>,
     #[serde(default)] pub optional: Option<bool>,
-    #[serde(default)] pub cardinality: Option<Cardinality>,
+    #[serde(default)] pub multi: Option<bool>,
     #[serde(default)] pub constraints: Option<Vec<Constraint>>,
 }
 
@@ -78,13 +78,6 @@ pub enum ScalarAllType {
     String,
     Datetime,
     Duration,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Cardinality {
-    Single,
-    Multi
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -130,13 +123,58 @@ impl Generator {
 
         let fields = self.get_table_all_fields(schema)?;
         for (index, field) in fields.iter().enumerate() {
+            let is_optional = field.optional.unwrap_or(false);
+            let is_multi = field.multi.unwrap_or(false);
+
+            if is_optional && is_multi {
+                return Err(Error::InvalidAttribute("Optional and multi cannot be both true".to_string()))
+            }
+
             field_names.push(field.name.clone());
-            field_definitions.push(format!("{TAB}pub {}: {},", field.name, field.kind.to_rust_type()));
-            field_parses.push(format!(
-                "{TAB}{TAB}let {field_name} = {parse_function}(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;",
-                field_name = field.name,
-                parse_function = field.kind.to_parse_code(),
+
+            field_definitions.push(format!(
+                "{TAB}pub {}: {},",
+                field.name,
+                {
+                    let base_type = field.kind.to_rust_type();
+                    let multi_type = if is_multi { format!("Vec<{}>", base_type) } else { base_type };
+                    if is_optional { format!("Option<{}>", multi_type) } else { multi_type }
+                },
             ));
+
+            let field_parse = if is_optional {
+                format!(
+                    "{TAB}{TAB}let {field_name} = parse_optional(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;",
+                    field_name = field.name,
+                )
+            }
+            else if is_multi {
+                format!(
+                    "{TAB}{TAB}let {field_name} = parse_multi(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;",
+                    field_name = field.name,
+                )
+            } else {
+                format!(
+                    "{TAB}{TAB}let {field_name} = parse(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;",
+                    field_name = field.name,
+                )
+            };
+            field_parses.push(field_parse);
+
+            fn generate_field_link_init() -> String {
+
+            }
+
+            if is_optional {
+                format!(
+                    "if let Some(link) = {field_name}.deref_mut() {{ link.init().map_err(|e| (*id, e))?; }}",
+                    field_name = field.name,
+                )
+            } else if is_multi {
+                format!("")
+            } else {
+                format!("")
+            }
 
             match &field.kind {
                 FieldKind::Link { .. } => {
@@ -146,7 +184,17 @@ impl Generator {
                     ));
                 },
                 FieldKind::Tuple { types } => {
-                    link_inits.push(format!("{TAB}{TAB}todo!(\"Plz link my tuple!\");"));
+                    for (i, item) in types.iter().enumerate() {
+                        match item {
+                            FieldKind::Link { .. } => {}
+                            _ => continue,
+                        }
+
+                        link_inits.push(format!(
+                            "{TAB}{TAB}{TAB}{TAB}row.{field_name}.{i}.init().map_err(|e| (*id, e))?;",
+                            field_name = field.name,
+                        ));
+                    }
                 },
                 _ => {},
             }
@@ -203,7 +251,6 @@ r#"
                 id,
                 error,
             }})?;
-
 "#,
                 inits_code = link_inits.join("\n"),
                 workbook = schema.workbook,
@@ -218,7 +265,7 @@ r#"{GENERATED_FILE_WARNING}
 use std::collections::HashMap;
 use std::mem::MaybeUninit;
 use tracing::info;
-use {CRATE_PREFIX}::{{DataId, error::*}};
+use {CRATE_PREFIX}::{{DataId, Link, error::*, parse::*}};
 
 static mut {data_cell_name}: MaybeUninit<{data_type_name}> = MaybeUninit::uninit();
 
@@ -496,7 +543,7 @@ impl FieldKind {
                 format!("{CRATE_PREFIX}::{enum_type}")
             },
             FieldKind::Link { link_type } => {
-                format!("crate::Link<'static, {CRATE_PREFIX}::{link_type}>")
+                format!("Link<'static, {CRATE_PREFIX}::{link_type}>")
             },
             FieldKind::Tuple { types } => {
                 let type_strings = to_tuple_type_strings(types);
@@ -505,37 +552,37 @@ impl FieldKind {
         }
     }
 
-    fn to_parse_code(&self) -> String {
-        match self {
-            FieldKind::Scalar { scalar_type: t } => format!("{CRATE_PREFIX}::{}", match t {
-                ScalarAllType::Id => "parse_id",
-                ScalarAllType::Bool => "parse_bool",
-                ScalarAllType::Int8 => "parse_i8",
-                ScalarAllType::Int16 => "parse_i16",
-                ScalarAllType::Int32 => "parse_i32",
-                ScalarAllType::Int64 => "parse_i64",
-                ScalarAllType::Uint8 => "parse_u8",
-                ScalarAllType::Uint16 => "parse_u16",
-                ScalarAllType::Uint32 => "parse_u32",
-                ScalarAllType::Uint64 => "parse_u64",
-                ScalarAllType::Float32 => "parse_f32",
-                ScalarAllType::Float64 => "parse_f64",
-                ScalarAllType::String => "parse_string",
-                ScalarAllType::Datetime => "parse_datetime",
-                ScalarAllType::Duration => "parse_duration",
-            }),
-            FieldKind::Enum { enum_type } => format!("{CRATE_PREFIX}::{enum_type}::parse"),
-            FieldKind::Link { link_type } => format!("{CRATE_PREFIX}::parse_link::<{CRATE_PREFIX}::{link_type}>"),
-            FieldKind::Tuple { types } => {
-                let type_strings = to_tuple_type_strings(types);
-                format!(
-                    "{CRATE_PREFIX}::parse_tuple_{}::<{}>",
-                    type_strings.len(),
-                    type_strings.join(", ")
-                )
-            },
-        }
-    }
+    // fn to_parse_code(&self) -> String {
+    //     match self {
+    //         FieldKind::Scalar { scalar_type: t } => match t {
+    //             ScalarAllType::Id => "DataId::parse",
+    //             ScalarAllType::Bool => "bool::parse",
+    //             ScalarAllType::Int8 => "i8::parse",
+    //             ScalarAllType::Int16 => "i16::parse",
+    //             ScalarAllType::Int32 => "i32::parse",
+    //             ScalarAllType::Int64 => "i64::parse",
+    //             ScalarAllType::Uint8 => "u8::parse",
+    //             ScalarAllType::Uint16 => "u16::parse",
+    //             ScalarAllType::Uint32 => "u32::parse",
+    //             ScalarAllType::Uint64 => "u64::parse",
+    //             ScalarAllType::Float32 => "f32::parse",
+    //             ScalarAllType::Float64 => "f64::parse",
+    //             ScalarAllType::String => "String::parse",
+    //             ScalarAllType::Datetime => "parse_datetime",
+    //             ScalarAllType::Duration => "parse_duration",
+    //         }.to_string(),
+    //         FieldKind::Enum { enum_type } => format!("{CRATE_PREFIX}::{enum_type}::parse"),
+    //         FieldKind::Link { link_type } => format!("Link::<{CRATE_PREFIX}::{link_type}>::parse"),
+    //         FieldKind::Tuple { types } => {
+    //             let type_strings = to_tuple_type_strings(types);
+    //             format!(
+    //                 "Tuple{}::<{}>::parse",
+    //                 type_strings.len(),
+    //                 type_strings.join(", ")
+    //             )
+    //         },
+    //     }
+    // }
 }
 
 fn to_tuple_type_strings(fields: &[FieldKind]) -> Vec<String> {

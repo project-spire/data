@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::mem::MaybeUninit;
 use tracing::info;
-use crate::{DataId, error::*};
+use crate::{DataId, Link, error::*, parse::*};
 
 static mut RANDOM_BOX_DATA: MaybeUninit<RandomBoxData> = MaybeUninit::uninit();
 
@@ -12,7 +12,7 @@ static mut RANDOM_BOX_DATA: MaybeUninit<RandomBoxData> = MaybeUninit::uninit();
 pub struct RandomBox {
     pub id: DataId,
     pub name: String,
-    pub items: (crate::Link<'static, crate::item::Item>, u16),
+    pub items: Vec<(Link<'static, crate::item::Item>, u16)>,
 }
 
 pub struct RandomBoxData {
@@ -27,9 +27,9 @@ impl RandomBox {
             return Err(("", ParseError::InvalidColumnCount { expected: FIELDS_COUNT, actual: row.len() }));
         }
 
-        let id = crate::parse_id(&row[0]).map_err(|e| ("id", e))?;
-        let name = crate::parse_string(&row[1]).map_err(|e| ("name", e))?;
-        let items = crate::parse_tuple_2::<crate::Link<'static, crate::item::Item>, u16>(&row[2]).map_err(|e| ("items", e))?;
+        let id = parse(&row[0]).map_err(|e| ("id", e))?;
+        let name = parse(&row[1]).map_err(|e| ("name", e))?;
+        let items = parse_multi(&row[2]).map_err(|e| ("items", e))?;
 
         Ok((id, Self {
             id,
@@ -97,7 +97,7 @@ impl crate::Loadable for RandomBoxData {
     fn init() -> Result<(), Error> {
         fn link(data: &mut HashMap<DataId, RandomBox>) -> Result<(), (DataId, LinkError)> {
             for (id, row) in data {
-        todo!("Plz link my tuple!");
+                row.items.0.init().map_err(|e| (*id, e))?;
             }
 
             Ok(())
@@ -110,7 +110,6 @@ impl crate::Loadable for RandomBoxData {
                 id,
                 error,
             })?;
-
 
         Ok(())
     }
