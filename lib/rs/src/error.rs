@@ -2,11 +2,18 @@ use crate::DataId;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("Workbook error: {0}")]
-    Workbook(#[from] calamine::OdsError),
+    #[error("Workbook error [{workbook}]: {error}")]
+    Workbook {
+        workbook: String,
+        error: calamine::OdsError,
+    },
 
-    #[error("Sheet error: {0}")]
-    Sheet(#[from] calamine::Error),
+    #[error("Sheet error [{workbook} / {sheet}]: {error}")]
+    Sheet {
+        workbook: String,
+        sheet: String,
+        error: calamine::OdsError,
+    },
 
     #[error("Parse error [{workbook} / {sheet} / {row} / {column}]: {error}")]
     Parse {
@@ -17,14 +24,16 @@ pub enum Error {
         error: ParseError
     },
 
-    #[error("Missing link for {type_name}({id})")]
-    MissingLink { type_name: &'static str, id: DataId },
+    #[error("Link error [{workbook} / {sheet} / {id}]: {error}")]
+    Link {
+        workbook: &'static str,
+        sheet: &'static str,
+        id: DataId,
+        error: LinkError, 
+    },
 
     #[error("Duplicate id on {type_name}({id}): {a}, {b}")]
     DuplicateId { type_name: &'static str, id: DataId, a: String, b: String },
-
-    #[error("Parse error: {0}")]
-    ParseInt(#[from] std::num::ParseIntError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -43,4 +52,10 @@ pub enum ParseError {
 
     #[error("Invalid item count [{type_name}]: expected {expected}, got {actual}")]
     InvalidItemCount { type_name: &'static str, expected: usize, actual: usize },
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum LinkError {
+    #[error("Missing link for {type_name}({id})")]
+    Missing { type_name: &'static str, id: DataId },
 }

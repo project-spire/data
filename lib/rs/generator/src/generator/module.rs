@@ -122,14 +122,18 @@ r#"{GENERATED_FILE_WARNING}
                 TableSchema::Abstract(_) => continue,
             };
 
-            let file = table.name.parent_namespace().join("/")
-                + &format!("/{}", schema.workbook);
+            let file = {
+                let mut parent_dir = table.name.parent_namespace().join("/");
+                if !parent_dir.is_empty() {
+                    parent_dir.push_str("/");
+                }
+                parent_dir + &schema.workbook
+            };
 
             concrete_table_loads.push(
                 format!(
-                    "{TAB}load::<{}::{}>({}, \"{}\", &mut tasks);",
-                    table.name.parent_namespace().join("::"),
-                    table.name.as_data_type(),
+                    "{TAB}load::<{}>({}, \"{}\", &mut tasks);",
+                    table.name.as_data_type(true),
                     format!("data_dir.join(\"{}\")", file),
                     schema.sheet,
                 )
@@ -145,9 +149,8 @@ r#"{GENERATED_FILE_WARNING}
 
             concrete_table_inits.push(
                 format!(
-                    "{TAB}init::<{}::{}>(&mut tasks);",
-                    table.name.parent_namespace().join("::"),
-                    table.name.as_data_type(),
+                    "{TAB}init::<{}>(&mut tasks);",
+                    table.name.as_data_type(true),
                 )
             );
         }
@@ -178,10 +181,19 @@ async fn load_concrete_tables(data_dir: &std::path::PathBuf) -> Result<(), Error
         let sheet = sheet.to_owned();
 
         tasks.push(tokio::task::spawn(async move {{
-            let mut workbook: calamine::Ods<_> = calamine::open_workbook(file)?;
+            let mut workbook: calamine::Ods<_> = calamine::open_workbook(&file)
+                .map_err(|error| Error::Workbook {{
+                    workbook: file.display().to_string(),
+                    error,
+                }})?;
             let sheet = workbook
                 .with_header_row(calamine::HeaderRow::Row({HEADER_ROWS}))
-                .worksheet_range(&sheet)?;
+                .worksheet_range(&sheet)
+                .map_err(|error| Error::Sheet {{
+                    workbook: file.display().to_string(),
+                    sheet,
+                    error,
+                }})?;
             T::load(&sheet.rows().collect::<Vec<_>>()).await?;
 
             Ok(())

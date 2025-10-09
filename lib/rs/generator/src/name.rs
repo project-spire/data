@@ -40,9 +40,16 @@ impl Name {
 
     pub fn as_type(&self, with_namespace: bool) -> String {
         if with_namespace && !self.namespace.is_empty() {
+            let parent_namespace = self.parent_namespace().join("::");
+            let parent_namespace = if parent_namespace.is_empty() {
+                "".to_string()
+            } else {
+                format!("{}::", parent_namespace)
+            };
+            
             format!(
-                "{}::{}",
-                self.parent_namespace().join("::"),
+                "{}{}",
+                parent_namespace,
                 self.name.to_upper_camel_case(),
             )
         } else {
@@ -50,8 +57,8 @@ impl Name {
         }
     }
 
-    pub fn as_data_type(&self) -> String {
-        format!("{}Data", self.as_type(false))
+    pub fn as_data_type(&self, with_namespace: bool) -> String {
+        format!("{}Data", self.as_type(with_namespace))
     }
 
     pub fn as_data_type_cell(&self) -> String {

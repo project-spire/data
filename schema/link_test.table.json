@@ -1,0 +1,35 @@
+{
+  "name": "LinkTest",
+  "type": "concrete",
+  "workbook": "link_test.ods",
+  "sheet": "LinkTest",
+  "fields": [
+    {
+      "name": "id",
+      "kind": "scalar",
+      "type": "id",
+      "target": "all"
+    },
+    {
+      "name": "item_link",
+      "target": "all",
+      "kind": "link",
+      "type": "item::Item"
+    },
+    {
+      "name": "optional_item_link",
+      "target": "all",
+      "kind": "link",
+      "type": "item::Item",
+      "optional": true
+    },
+    {
+      "name": "multi_item_link",
+      "target": "all",
+      "kind": "link",
+      "type": "item::Item",
+      "cardinality": "multi"
+    }
+  ],
+  "types": []
+}

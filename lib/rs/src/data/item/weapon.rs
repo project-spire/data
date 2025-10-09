@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::mem::MaybeUninit;
 use tracing::info;
-use crate::{DataId, error::Error, error::ParseError};
+use crate::{DataId, error::*};
 
 static mut WEAPON_DATA: MaybeUninit<WeaponData> = MaybeUninit::uninit();
 

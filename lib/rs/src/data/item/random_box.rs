@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::mem::MaybeUninit;
 use tracing::info;
-use crate::{DataId, error::Error, error::ParseError};
+use crate::{DataId, error::*};
 
 static mut RANDOM_BOX_DATA: MaybeUninit<RandomBoxData> = MaybeUninit::uninit();
 
@@ -95,6 +95,23 @@ impl crate::Loadable for RandomBoxData {
     }
 
     fn init() -> Result<(), Error> {
+        fn link(data: &mut HashMap<DataId, RandomBox>) -> Result<(), (DataId, LinkError)> {
+            for (id, row) in data {
+        todo!("Plz link my tuple!");
+            }
+
+            Ok(())
+        }
+
+        link(&mut unsafe { RANDOM_BOX_DATA.assume_init_mut() }.data)
+            .map_err(|(id, error)| Error::Link {
+                workbook: "random_box.ods",
+                sheet: "RandomBox",
+                id,
+                error,
+            })?;
+
+
         Ok(())
     }
 }

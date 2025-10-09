@@ -44,7 +44,7 @@ pub trait TableSchematic {
 pub struct Field {
     pub name: String,
     #[serde(flatten)] pub kind: FieldKind,
-    #[serde(default)] pub desc: Option<String>,
+    // #[serde(default)] pub desc: Option<String>,
     #[serde(default)] pub optional: Option<bool>,
     #[serde(default)] pub cardinality: Option<Cardinality>,
     #[serde(default)] pub constraints: Option<Vec<Constraint>>,
@@ -64,7 +64,7 @@ pub enum FieldKind {
     },
     Tuple {
         types: Vec<FieldKind>,
-    }
+    },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -123,21 +123,13 @@ impl Generator {
         name: &Name,
         schema: &ConcreteTableSchema,
     ) -> Result<String, Error> {
-        // Prepare field codes
-        let mut has_lifetime = false;
-        let mut lifetime_code = String::new();
-        let mut lifetime_parameter_code = String::new();
-
         let mut field_names = Vec::new();
         let mut field_parses = Vec::new();
         let mut field_definitions = Vec::new();
+        let mut link_inits = Vec::new();
 
         let fields = self.get_table_all_fields(schema)?;
         for (index, field) in fields.iter().enumerate() {
-            if let FieldKind::Link { .. } = &field.kind {
-                has_lifetime = true;
-            }
-
             field_names.push(field.name.clone());
             field_definitions.push(format!("{TAB}pub {}: {},", field.name, field.kind.to_rust_type()));
             field_parses.push(format!(
@@ -145,18 +137,26 @@ impl Generator {
                 field_name = field.name,
                 parse_function = field.kind.to_parse_code(),
             ));
-        }
 
-        if has_lifetime {
-            lifetime_code = "<'a>".to_string();
-            lifetime_parameter_code = "<'_>".to_string();
+            match &field.kind {
+                FieldKind::Link { .. } => {
+                    link_inits.push(format!(
+                        "{TAB}{TAB}{TAB}{TAB}row.{field_name}.init().map_err(|e| (*id, e))?;",
+                        field_name = field.name,
+                    ));
+                },
+                FieldKind::Tuple { types } => {
+                    link_inits.push(format!("{TAB}{TAB}todo!(\"Plz link my tuple!\");"));
+                },
+                _ => {},
+            }
         }
 
         let fields_count = fields.len();
 
         // Generate codes
         let data_cell_name = name.as_data_type_cell();
-        let data_type_name = name.as_data_type();
+        let data_type_name = name.as_data_type(false);
         let table_type_name = name.as_type(false);
         
         let field_definitions_code = field_definitions.join("\n");
@@ -173,10 +173,42 @@ impl Generator {
             let parent_full_name = parent.name.as_type(true);
 
             format!(
-                "{CRATE_PREFIX}::{parent_full_name}Data::insert(&id, {CRATE_PREFIX}::{parent_full_name}::{table_type_name}(row)).await?;"
+                r#"
+
+        for (id, row) in unsafe {{ {data_cell_name}.assume_init_ref() }}.data.iter() {{
+            {CRATE_PREFIX}::{parent_full_name}Data::insert(&id, {CRATE_PREFIX}::{parent_full_name}::{table_type_name}(row)).await?;
+        }}"#
             )
         } else {
             String::new()
+        };
+
+        let link_inits_code = if link_inits.is_empty() {
+            String::new()
+        } else {
+            format!(
+r#"
+        fn link(data: &mut HashMap<DataId, {table_type_name}>) -> Result<(), (DataId, LinkError)> {{
+            for (id, row) in data {{
+{inits_code}
+            }}
+
+            Ok(())
+        }}
+
+        link(&mut unsafe {{ {data_cell_name}.assume_init_mut() }}.data)
+            .map_err(|(id, error)| Error::Link {{
+                workbook: "{workbook}",
+                sheet: "{sheet}",
+                id,
+                error,
+            }})?;
+
+"#,
+                inits_code = link_inits.join("\n"),
+                workbook = schema.workbook,
+                sheet = schema.sheet,
+            )
         };
 
         Ok(format!(
@@ -186,20 +218,20 @@ r#"{GENERATED_FILE_WARNING}
 use std::collections::HashMap;
 use std::mem::MaybeUninit;
 use tracing::info;
-use {CRATE_PREFIX}::{{DataId, error::Error, error::ParseError}};
+use {CRATE_PREFIX}::{{DataId, error::*}};
 
 static mut {data_cell_name}: MaybeUninit<{data_type_name}> = MaybeUninit::uninit();
 
 #[derive(Debug)]
-pub struct {table_type_name}{lifetime_code} {{
+pub struct {table_type_name} {{
 {field_definitions_code}
 }}
 
-pub struct {data_type_name}{lifetime_code} {{
-    data: HashMap<DataId, {table_type_name}{lifetime_code}>,
+pub struct {data_type_name} {{
+    data: HashMap<DataId, {table_type_name}>,
 }}
 
-impl {table_type_name}{lifetime_code} {{
+impl {table_type_name} {{
     fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), (&'static str, ParseError)> {{
         const FIELDS_COUNT: usize = {fields_count};
 
@@ -215,13 +247,13 @@ impl {table_type_name}{lifetime_code} {{
     }}
 }}
 
-impl{lifetime_code} {CRATE_PREFIX}::Linkable for {table_type_name}{lifetime_parameter_code} {{
+impl {CRATE_PREFIX}::Linkable for {table_type_name} {{
     fn get(id: &DataId) -> Option<&'static Self> {{
         {data_type_name}::get(id)
     }}
 }}
 
-impl{lifetime_code} {data_type_name}{lifetime_parameter_code} {{
+impl {data_type_name} {{
     pub fn get(id: &DataId) -> Option<&'static {table_type_name}> {{
         unsafe {{ {data_cell_name}.assume_init_ref() }}.data.get(&id)
     }}
@@ -231,7 +263,7 @@ impl{lifetime_code} {data_type_name}{lifetime_parameter_code} {{
     }}
 }}
 
-impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_parameter_code} {{
+impl {CRATE_PREFIX}::Loadable for {data_type_name} {{
     async fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {{
         let mut objects = HashMap::new();
         let mut index = {HEADER_ROWS};
@@ -260,17 +292,13 @@ impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_param
         }}
 
         let data = Self {{ data: objects }};
-        unsafe {{ {data_cell_name}.write(data); }}
-
-        for (id, row) in unsafe {{ {data_cell_name}.assume_init_ref() }}.data.iter() {{
-            {parent_insert_code}
-        }}
+        unsafe {{ {data_cell_name}.write(data); }}{parent_insert_code}
 
         info!("Loaded {{}} rows", rows.len());
         Ok(())
     }}
 
-    fn init() -> Result<(), Error> {{
+    fn init() -> Result<(), Error> {{{link_inits_code}
         Ok(())
     }}
 }}
@@ -286,7 +314,7 @@ impl{lifetime_code} {CRATE_PREFIX}::Loadable for {data_type_name}{lifetime_param
         schema: &AbstractTableSchema,
     ) -> Result<String, Error> {
         let data_cell_name = name.as_data_type_cell();
-        let data_type_name = name.as_data_type();
+        let data_type_name = name.as_data_type(false);
         let table_type_name = name.as_type(false);
 
         let mut child_types = Vec::new();

@@ -8,8 +8,7 @@ mod error;
 use std::fmt::Formatter;
 use std::mem::MaybeUninit;
 use std::ops::Deref;
-use std::str::FromStr;
-use crate::error::Error;
+use crate::error::{Error, LinkError};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct DataId(u32);
@@ -43,15 +42,6 @@ impl Deref for DataId {
     }
 }
 
-impl FromStr for DataId {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let id = u32::from_str(s)?;
-        Ok(DataId(id))
-    }
-}
-
 impl<'a, T: Linkable> Deref for Link<'a, T> {
     type Target = T;
 
@@ -61,10 +51,10 @@ impl<'a, T: Linkable> Deref for Link<'a, T> {
 }
 
 impl<'a, T: Linkable + 'static> Link<'a, T> {
-    pub(crate) fn init(&mut self) -> Result<(), Error> {
+    pub(crate) fn init(&mut self) -> Result<(), LinkError> {
         let target = match T::get(&self.id) {
             Some(target) => target,
-            None => return Err(Error::MissingLink {
+            None => return Err(LinkError::Missing {
                 type_name: std::any::type_name::<T>(),
                 id: self.id,
             }),
