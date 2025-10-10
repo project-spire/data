@@ -230,29 +230,6 @@ impl Generator {
             };
 
             link_inits.push(link_init);
-
-            // match &field.kind {
-            //     FieldKind::Link { .. } => {
-            //         link_inits.push(format!(
-            //             "{TAB}{TAB}{TAB}{TAB}row.{field_name}.init().map_err(|e| (*id, e))?;",
-            //             field_name = field.name,
-            //         ));
-            //     },
-            //     FieldKind::Tuple { types } => {
-            //         for (i, item) in types.iter().enumerate() {
-            //             match item {
-            //                 FieldKind::Link { .. } => {}
-            //                 _ => continue,
-            //             }
-            //
-            //             link_inits.push(format!(
-            //                 "{TAB}{TAB}{TAB}{TAB}row.{field_name}.{i}.init().map_err(|e| (*id, e))?;",
-            //                 field_name = field.name,
-            //             ));
-            //         }
-            //     },
-            //     _ => {},
-            // }
         }
 
         let fields_count = fields.len();
@@ -603,38 +580,6 @@ impl FieldKind {
             },
         }
     }
-
-    // fn to_parse_code(&self) -> String {
-    //     match self {
-    //         FieldKind::Scalar { scalar_type: t } => match t {
-    //             ScalarAllType::Id => "DataId::parse",
-    //             ScalarAllType::Bool => "bool::parse",
-    //             ScalarAllType::Int8 => "i8::parse",
-    //             ScalarAllType::Int16 => "i16::parse",
-    //             ScalarAllType::Int32 => "i32::parse",
-    //             ScalarAllType::Int64 => "i64::parse",
-    //             ScalarAllType::Uint8 => "u8::parse",
-    //             ScalarAllType::Uint16 => "u16::parse",
-    //             ScalarAllType::Uint32 => "u32::parse",
-    //             ScalarAllType::Uint64 => "u64::parse",
-    //             ScalarAllType::Float32 => "f32::parse",
-    //             ScalarAllType::Float64 => "f64::parse",
-    //             ScalarAllType::String => "String::parse",
-    //             ScalarAllType::Datetime => "parse_datetime",
-    //             ScalarAllType::Duration => "parse_duration",
-    //         }.to_string(),
-    //         FieldKind::Enum { enum_type } => format!("{CRATE_PREFIX}::{enum_type}::parse"),
-    //         FieldKind::Link { link_type } => format!("Link::<{CRATE_PREFIX}::{link_type}>::parse"),
-    //         FieldKind::Tuple { types } => {
-    //             let type_strings = to_tuple_type_strings(types);
-    //             format!(
-    //                 "Tuple{}::<{}>::parse",
-    //                 type_strings.len(),
-    //                 type_strings.join(", ")
-    //             )
-    //         },
-    //     }
-    // }
 
     fn has_link(&self) -> bool {
         match &self {
