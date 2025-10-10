@@ -94,23 +94,26 @@ impl crate::Loadable for LinkTestData {
     }
 
     fn init() -> Result<(), Error> {
-        fn link(data: &mut HashMap<DataId, LinkTest>) -> Result<(), (DataId, LinkError)> {
-            for (id, row) in data {
+        (|| {
+            for (id, row) in &mut unsafe { LINK_TEST_DATA.assume_init_mut() }.data {
                 row.item_link.init().map_err(|e| (*id, e))?;
-                row.optional_item_link.init().map_err(|e| (*id, e))?;
-                row.multi_item_link.init().map_err(|e| (*id, e))?;
+
+                if let Some(optional_item_link) = row.optional_item_link.as_mut() {
+                    optional_item_link.init().map_err(|e| (*id, e))?;
+                }
+
+                for x in &mut row.multi_item_link {
+                    x.init().map_err(|e| (*id, e))?;
+                }
             }
 
             Ok(())
-        }
-
-        link(&mut unsafe { LINK_TEST_DATA.assume_init_mut() }.data)
-            .map_err(|(id, error)| Error::Link {
-                workbook: "link_test.ods",
-                sheet: "LinkTest",
-                id,
-                error,
-            })?;
+        })().map_err(|(id, error)| Error::Link {
+            workbook: "link_test.ods",
+            sheet: "LinkTest",
+            id,
+            error,
+        })?;
 
         Ok(())
     }

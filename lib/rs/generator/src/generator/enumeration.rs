@@ -83,6 +83,7 @@ impl Generator {
         Ok(format!(
             r#"{GENERATED_FILE_WARNING}
 use crate::error::ParseError;
+use crate::parse::*;
 
 {attributes_code}
 pub enum {enum_type_name} {{
@@ -91,7 +92,7 @@ pub enum {enum_type_name} {{
 
 impl {enum_type_name} {{
     pub fn parse(value: &calamine::Data) -> Result<Self, ParseError> {{
-        let enum_string = {CRATE_PREFIX}::parse_string(value)?;
+        let enum_string = String::parse(value)?;
 
         Ok(match enum_string.as_str() {{
 {enum_parses_code}

@@ -1,5 +1,6 @@
 // This is a generated file. DO NOT MODIFY.
 use crate::error::ParseError;
+use crate::parse::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, sqlx::Type)]
 #[sqlx(type_name = "race")]
@@ -11,7 +12,7 @@ pub enum Race {
 
 impl Race {
     pub fn parse(value: &calamine::Data) -> Result<Self, ParseError> {
-        let enum_string = crate::parse_string(value)?;
+        let enum_string = String::parse(value)?;
 
         Ok(match enum_string.as_str() {
             "None" => Self::None,

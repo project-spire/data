@@ -130,7 +130,8 @@ impl Generator {
                 return Err(Error::InvalidAttribute("Optional and multi cannot be both true".to_string()))
             }
 
-            field_names.push(field.name.clone());
+            let field_name = &field.name;
+            field_names.push(field_name.clone());
 
             field_definitions.push(format!(
                 "{TAB}pub {}: {},",
@@ -143,61 +144,115 @@ impl Generator {
             ));
 
             let field_parse = if is_optional {
-                format!(
-                    "{TAB}{TAB}let {field_name} = parse_optional(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;",
-                    field_name = field.name,
-                )
+                format!("{TAB}{TAB}let {field_name} = parse_optional(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;")
             }
             else if is_multi {
-                format!(
-                    "{TAB}{TAB}let {field_name} = parse_multi(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;",
-                    field_name = field.name,
-                )
+                format!("{TAB}{TAB}let {field_name} = parse_multi(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;")
             } else {
-                format!(
-                    "{TAB}{TAB}let {field_name} = parse(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;",
-                    field_name = field.name,
-                )
+                format!("{TAB}{TAB}let {field_name} = parse(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;")
             };
             field_parses.push(field_parse);
 
-            fn generate_field_link_init() -> String {
-
+            // Generate link initialization codes
+            if !field.kind.has_link() {
+                continue;
             }
 
-            if is_optional {
+            let link_init = if is_optional {
+                let link_init = match &field.kind {
+                    FieldKind::Link { .. } => {
+                        format!("{TAB}{TAB}{TAB}{TAB}{TAB}{field_name}.init().map_err(|e| (*id, e))?;")
+                    },
+                    FieldKind::Tuple { types } => {
+                        let mut inner_link_inits = Vec::new();
+                        for (i, item) in types.iter().enumerate() {
+                            match item {
+                                FieldKind::Link { .. } => {}
+                                _ => continue,
+                            }
+
+                            inner_link_inits.push(format!("{TAB}{TAB}{TAB}{TAB}{field_name}.{i}.init().map_err(|e| (*id, e))?;"));
+                        }
+                        inner_link_inits.join("\n")
+                    },
+                    _ => panic!("Invalid field type"),
+                };
+
                 format!(
-                    "if let Some(link) = {field_name}.deref_mut() {{ link.init().map_err(|e| (*id, e))?; }}",
-                    field_name = field.name,
+                    r#"{TAB}{TAB}{TAB}{TAB}if let Some({field_name}) = row.{field_name}.as_mut() {{
+{link_init}
+                }}"#
                 )
             } else if is_multi {
-                format!("")
-            } else {
-                format!("")
-            }
+                let link_init = match &field.kind {
+                    FieldKind::Link { .. } => {
+                        format!("{TAB}{TAB}{TAB}{TAB}{TAB}x.init().map_err(|e| (*id, e))?;")
+                    },
+                    FieldKind::Tuple { types } => {
+                        let mut inner_link_inits = Vec::new();
+                        for (i, item) in types.iter().enumerate() {
+                            match item {
+                                FieldKind::Link { .. } => {}
+                                _ => continue,
+                            }
 
-            match &field.kind {
-                FieldKind::Link { .. } => {
-                    link_inits.push(format!(
-                        "{TAB}{TAB}{TAB}{TAB}row.{field_name}.init().map_err(|e| (*id, e))?;",
-                        field_name = field.name,
-                    ));
-                },
-                FieldKind::Tuple { types } => {
-                    for (i, item) in types.iter().enumerate() {
-                        match item {
-                            FieldKind::Link { .. } => {}
-                            _ => continue,
+                            inner_link_inits.push(format!("{TAB}{TAB}{TAB}{TAB}{TAB}x.{i}.init().map_err(|e| (*id, e))?;"));
                         }
+                        inner_link_inits.join("\n")
+                    },
+                    _ => panic!("Invalid field type"),
+                };
 
-                        link_inits.push(format!(
-                            "{TAB}{TAB}{TAB}{TAB}row.{field_name}.{i}.init().map_err(|e| (*id, e))?;",
-                            field_name = field.name,
-                        ));
+                format!(
+                    r#"{TAB}{TAB}{TAB}{TAB}for x in &mut row.{field_name} {{
+{link_init}
+                }}"#
+                )
+            } else {
+                match &field.kind {
+                    FieldKind::Link { .. } => {
+                        format!("{TAB}{TAB}{TAB}{TAB}row.{field_name}.init().map_err(|e| (*id, e))?;")
+                    },
+                    FieldKind::Tuple { types } => {
+                        let mut inner_link_inits = Vec::new();
+                        for (i, item) in types.iter().enumerate() {
+                            match item {
+                                FieldKind::Link { .. } => {}
+                                _ => continue,
+                            }
+
+                            inner_link_inits.push(format!("{TAB}{TAB}{TAB}row.{field_name}.{i}.init().map_err(|e| (*id, e))?;"));
+                        }
+                        inner_link_inits.join("\n")
                     }
-                },
-                _ => {},
-            }
+                    _ => panic!("Invalid field type"),
+                }
+            };
+
+            link_inits.push(link_init);
+
+            // match &field.kind {
+            //     FieldKind::Link { .. } => {
+            //         link_inits.push(format!(
+            //             "{TAB}{TAB}{TAB}{TAB}row.{field_name}.init().map_err(|e| (*id, e))?;",
+            //             field_name = field.name,
+            //         ));
+            //     },
+            //     FieldKind::Tuple { types } => {
+            //         for (i, item) in types.iter().enumerate() {
+            //             match item {
+            //                 FieldKind::Link { .. } => {}
+            //                 _ => continue,
+            //             }
+            //
+            //             link_inits.push(format!(
+            //                 "{TAB}{TAB}{TAB}{TAB}row.{field_name}.{i}.init().map_err(|e| (*id, e))?;",
+            //                 field_name = field.name,
+            //             ));
+            //         }
+            //     },
+            //     _ => {},
+            // }
         }
 
         let fields_count = fields.len();
@@ -236,23 +291,20 @@ impl Generator {
         } else {
             format!(
 r#"
-        fn link(data: &mut HashMap<DataId, {table_type_name}>) -> Result<(), (DataId, LinkError)> {{
-            for (id, row) in data {{
+        (|| {{
+            for (id, row) in &mut unsafe {{ {data_cell_name}.assume_init_mut() }}.data {{
 {inits_code}
             }}
 
             Ok(())
-        }}
-
-        link(&mut unsafe {{ {data_cell_name}.assume_init_mut() }}.data)
-            .map_err(|(id, error)| Error::Link {{
-                workbook: "{workbook}",
-                sheet: "{sheet}",
-                id,
-                error,
-            }})?;
+        }})().map_err(|(id, error)| Error::Link {{
+            workbook: "{workbook}",
+            sheet: "{sheet}",
+            id,
+            error,
+        }})?;
 "#,
-                inits_code = link_inits.join("\n"),
+                inits_code = link_inits.join("\n\n"),
                 workbook = schema.workbook,
                 sheet = schema.sheet,
             )
@@ -583,6 +635,30 @@ impl FieldKind {
     //         },
     //     }
     // }
+
+    fn has_link(&self) -> bool {
+        match &self {
+            FieldKind::Scalar { .. } => false,
+            FieldKind::Enum { .. } => false,
+            FieldKind::Link { .. } => true,
+            FieldKind::Tuple { types } => {
+                let mut has_link = false;
+                for t in types {
+                    match t {
+                        FieldKind::Scalar { .. } => continue,
+                        FieldKind::Enum { .. } => continue,
+                        FieldKind::Link { .. } => {
+                            has_link = true;
+                            break;
+                        }
+                        FieldKind::Tuple { .. } => panic!("Nested tuples are not supported"),
+                    }
+                }
+
+                has_link
+            }
+        }
+    }
 }
 
 fn to_tuple_type_strings(fields: &[FieldKind]) -> Vec<String> {

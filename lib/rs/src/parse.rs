@@ -28,87 +28,96 @@ pub(crate) fn parse_optional<T: Parsable>(
 pub(crate) fn parse_multi<T: Parsable>(
     value: &calamine::Data,
 ) -> Result<Vec<T>, ParseError> {
-    let item_strings = parse_wrapped_items(value, "array", '[', ']')?;
-    let mut items = Vec::new();
-
-    for item_string in &item_strings {
-        items.push(T::parse_string(item_string)?)
-    }
-
-    Ok(items)
-}
-
-fn parse_wrapped_items<'a>(
-    value: &'a calamine::Data,
-    type_name: &'static str,
-    start_wrapper: char,
-    end_wrapper: char,
-) -> Result<Vec<&'a str>, ParseError> {
     let s = match value.get_string() {
         Some(s) => s.trim(),
         None => return Err(ParseError::InvalidFormat {
-            type_name,
+            type_name: "array",
             expected: "string",
             actual: value.to_string(),
         }),
-    };
+    }.trim();
 
-    parse_wrapped_items_string(s, type_name, start_wrapper, end_wrapper)
-}
-
-fn parse_wrapped_items_string<'a>(
-    s: &'a str,
-    type_name: &'static str,
-    start_wrapper: char,
-    end_wrapper: char,
-) -> Result<Vec<&'a str>, ParseError> {
     if s.len() < 2
-        || s.chars().nth(0).unwrap() != start_wrapper
-        || s.chars().nth_back(0).unwrap() != end_wrapper {
+        || s.chars().nth(0).unwrap() != '['
+        || s.chars().nth_back(0).unwrap() != ']' {
         return Err(ParseError::InvalidFormat {
-            type_name,
+            type_name: "array",
             expected: "wrappers",
             actual: s.to_string(),
         });
     }
 
-    let v: Vec<&'a str> = s[1..s.len() - 1]
-        .split(",")
-        .map(|item| item.trim())
-        .filter(|item| !item.is_empty())
-        .collect();
+    let s = s[1..s.len() - 1].trim();
+    let mut result = Vec::new();
+    let mut current = String::new();
+    let mut depth = 0;
 
-    Ok(v)
+    for c in s.chars() {
+        match c {
+            '(' => {
+                depth += 1;
+                current.push(c);
+            }
+            ')' => {
+                depth -= 1;
+                current.push(c);
+            }
+            ',' if depth == 0 => {
+                result.push(current.trim().to_string());
+                current.clear();
+            }
+            _ => {
+                current.push(c);
+            }
+        }
+    }
+
+    if !current.is_empty() {
+        result.push(current.trim().to_string());
+    }
+
+    Ok(result
+        .iter()
+        .map(|s| T::parse_string(&s))
+        .collect::<Result<Vec<_>, _>>()?
+    )
 }
 
 fn parse_tuple(value: &calamine::Data, count: usize) -> Result<Vec<&str>, ParseError> {
-    let item_strings = parse_wrapped_items(value, "tuple", '(', ')')?;
-    if item_strings.len() != count {
-        return Err(ParseError::InvalidItemCount {
+    let s = match value.get_string() {
+        Some(s) => s.trim(),
+        None => return Err(ParseError::InvalidFormat {
             type_name: "tuple",
-            expected: count,
-            actual: item_strings.len(),
-        });
-    }
+            expected: "string",
+            actual: value.to_string(),
+        }),
+    }.trim();
 
-    Ok(item_strings)
+    parse_tuple_string(s, count)
 }
 
 fn parse_tuple_string(s: &str, count: usize) -> Result<Vec<&str>, ParseError> {
-    let item_strings = parse_wrapped_items_string(s, "tuple", '(', ')')?;
-    if item_strings.len() != count {
-        return Err(ParseError::InvalidItemCount {
+    if s.len() < 2
+        || s.chars().nth(0).unwrap() != '('
+        || s.chars().nth_back(0).unwrap() != ')' {
+        return Err(ParseError::InvalidFormat {
             type_name: "tuple",
-            expected: count,
-            actual: item_strings.len(),
+            expected: "wrappers",
+            actual: s.to_string(),
         });
     }
 
-    Ok(item_strings)
+    let result: Vec<&str> = s[1..s.len() - 1]
+        .trim()
+        .split(",")
+        .map(|item| item.trim())
+        .collect();
+
+    Ok(result)
 }
 
 fn to_integer<T>(value: &calamine::Data) -> Result<i64, ParseError> {
-    match value.get_int() {
+    match value.as_i64() {
         Some(i) => Ok(i),
         None => Err(ParseError::InvalidFormat {
             type_name: std::any::type_name::<T>(),
@@ -129,7 +138,7 @@ fn string_to_integer<T: FromStr>(s: &str) -> Result<T, ParseError> {
 }
 
 fn to_float<T>(value: &calamine::Data) -> Result<f64, ParseError> {
-    match value.get_float() {
+    match value.as_f64() {
         Some(f) => Ok(f),
         None => Err(ParseError::InvalidFormat {
             type_name: std::any::type_name::<T>(),

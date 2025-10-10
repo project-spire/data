@@ -95,21 +95,20 @@ impl crate::Loadable for RandomBoxData {
     }
 
     fn init() -> Result<(), Error> {
-        fn link(data: &mut HashMap<DataId, RandomBox>) -> Result<(), (DataId, LinkError)> {
-            for (id, row) in data {
-                row.items.0.init().map_err(|e| (*id, e))?;
+        (|| {
+            for (id, row) in &mut unsafe { RANDOM_BOX_DATA.assume_init_mut() }.data {
+                for x in &mut row.items {
+                    x.0.init().map_err(|e| (*id, e))?;
+                }
             }
 
             Ok(())
-        }
-
-        link(&mut unsafe { RANDOM_BOX_DATA.assume_init_mut() }.data)
-            .map_err(|(id, error)| Error::Link {
-                workbook: "random_box.ods",
-                sheet: "RandomBox",
-                id,
-                error,
-            })?;
+        })().map_err(|(id, error)| Error::Link {
+            workbook: "random_box.ods",
+            sheet: "RandomBox",
+            id,
+            error,
+        })?;
 
         Ok(())
     }
