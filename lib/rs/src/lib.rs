@@ -4,10 +4,12 @@ pub use crate::data::*;
 mod error;
 mod parse;
 
-use crate::error::{Error, LinkError};
-use std::fmt::Formatter;
+use std::fmt::{Display, Formatter};
+use std::hash::{Hash, Hasher};
 use std::mem::MaybeUninit;
 use std::ops::Deref;
+
+use crate::error::{Error, LinkError};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct DataId(u32);
@@ -27,7 +29,7 @@ pub(crate) trait Loadable: Sized {
     fn init() -> Result<(), Error>;
 }
 
-impl std::fmt::Display for DataId {
+impl Display for DataId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "DataId({})", self.0)
     }
@@ -38,6 +40,21 @@ impl Deref for DataId {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<T: Linkable> Clone for Link<T> {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            target: self.target,
+        }
+    }
+}
+
+impl<T: Linkable> Display for Link<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Link({:?})", self.id)
     }
 }
 
@@ -65,3 +82,17 @@ impl<T: Linkable + 'static> Link<T> {
         Ok(())
     }
 }
+
+impl<T: Linkable + 'static> Hash for Link<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+impl<T: Linkable + 'static> PartialEq for Link<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl<T: Linkable + 'static> Eq for Link<T> {}

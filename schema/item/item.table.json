@@ -1,6 +1,6 @@
 {
     "name": "Item",
-    "type": "abstract",
+    "kind": "abstract",
     "fields": [
         {
             "name": "id",

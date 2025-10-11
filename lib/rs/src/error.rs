@@ -21,7 +21,7 @@ pub enum Error {
         sheet: &'static str,
         row: usize,
         column: &'static str,
-        error: ParseError
+        error: ParseError,
     },
 
     #[error("Link error [{workbook} / {sheet} / {id}]: {error}")]
@@ -29,33 +29,72 @@ pub enum Error {
         workbook: &'static str,
         sheet: &'static str,
         id: DataId,
-        error: LinkError, 
+        error: LinkError,
     },
 
     #[error("Duplicate id on {type_name}({id}): {a}, {b}")]
-    DuplicateId { type_name: &'static str, id: DataId, a: String, b: String },
+    DuplicateId {
+        type_name: &'static str,
+        id: DataId,
+        a: String,
+        b: String,
+    },
+
+    #[error("Constraint error [{workbook} / {sheet} / {row} / {column}]: {error}")]
+    Constraint {
+        workbook: &'static str,
+        sheet: &'static str,
+        row: usize,
+        column: &'static str,
+        error: ConstraintError,
+    },
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
     #[error("Invalid format [{type_name}]: expected {expected}, got {actual}")]
-    InvalidFormat { type_name: &'static str, expected: &'static str, actual: String },
+    InvalidFormat {
+        type_name: &'static str,
+        expected: &'static str,
+        actual: String,
+    },
 
     #[error("Invalid value [{type_name}]: {value}")]
-    InvalidValue { type_name: &'static str, value: String },
+    InvalidValue {
+        type_name: &'static str,
+        value: String,
+    },
 
     #[error("Out of range [{type_name}]: expected [{min}, {max}], got {value}")]
-    OutOfRange { type_name: &'static str, min: i64, max: i64, value: i64 },
+    OutOfRange {
+        type_name: &'static str,
+        min: i64,
+        max: i64,
+        value: i64,
+    },
 
     #[error("Invalid columns count: e")]
     InvalidColumnCount { expected: usize, actual: usize },
 
     #[error("Invalid item count [{type_name}]: expected {expected}, got {actual}")]
-    InvalidItemCount { type_name: &'static str, expected: usize, actual: usize },
+    InvalidItemCount {
+        type_name: &'static str,
+        expected: usize,
+        actual: usize,
+    },
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum LinkError {
     #[error("Missing link for {type_name}({id})")]
     Missing { type_name: &'static str, id: DataId },
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ConstraintError {
+    #[error("Value [{type_name}] {value} is not unique")]
+    Unique {
+        type_name: &'static str,
+        value: String,
+    },
 }

@@ -23,7 +23,7 @@ impl RandomBox {
     fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), (&'static str, ParseError)> {
         const FIELDS_COUNT: usize = 3;
 
-        if row.len() != FIELDS_COUNT {
+        if row.len() < FIELDS_COUNT {
             return Err(("", ParseError::InvalidColumnCount { expected: FIELDS_COUNT, actual: row.len() }));
         }
 
@@ -59,6 +59,8 @@ impl crate::Loadable for RandomBoxData {
     async fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {
         let mut objects = HashMap::new();
         let mut index = 2;
+
+
         for row in rows {
             let (id, object) = RandomBox::parse(row)
                 .map_err(|(column, error)| Error::Parse {
@@ -78,8 +80,9 @@ impl crate::Loadable for RandomBoxData {
                 });
             }
 
+
             objects.insert(id, object);
-            
+
             index += 1;
         }
 

@@ -1,6 +1,6 @@
 {
     "name": "Weapon",
-    "type": "concrete",
+    "kind": "concrete",
     "extend": "item::Equipment",
     "workbook": "weapon.ods",
     "sheet": "Weapon",

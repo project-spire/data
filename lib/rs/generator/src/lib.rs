@@ -1,13 +1,13 @@
 mod collect;
-mod generator;
 mod error;
+mod generator;
 mod name;
 
-use std::path::PathBuf;
-use serde::Deserialize;
-use crate::name::Name;
 use crate::error::Error;
 use crate::generator::Generator;
+use crate::name::Name;
+use serde::Deserialize;
+use std::path::PathBuf;
 
 const HEADER_ROWS: usize = 2;
 const TAB: &str = "    ";
@@ -35,12 +35,13 @@ impl Config {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 enum Target {
     Client,
     Server,
     All,
+    None,
 }
 
 impl Target {

@@ -4,17 +4,37 @@
     "properties": {
         "name": { "type": "string" },
         "kind": { "enum": ["concrete", "abstract"] },
+        "workbook": { "type": "string" },
         "sheet": { "type": "string" },
         "extend": { "type": "string" },
         "fields": { "type": "array", "items": { "$ref": "#/$defs/field" } },
         "indices": { "type": "array", "items": { "$ref": "#/$defs/index" } }
     },
-    "required": ["name", "kind", "sheet", "fields"],
+    "required": ["name", "kind", "fields"],
     "additionalProperties": false,
     "$defs": {
         "constraint": {
             "oneOf": [
-                "exclusive"
+                {
+                    "type": "string",
+                    "enum": ["unique"]
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "max": { "type": ["number", "string"] }
+                    },
+                    "required": ["max"],
+                    "additionalProperties": false
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "min": { "type": ["number", "string"] }
+                    },
+                    "required": ["min"],
+                    "additionalProperties": false
+                }
             ]
         },
         "field": {
@@ -22,9 +42,9 @@
             "properties": {
                 "name": { "type": "string" },
                 "desc": { "type": "string" },
-                "target": { "enum": ["client", "server", "all"] },
+                "target": { "enum": ["client", "server", "all", "none"] },
                 "optional": { "type": "boolean" },
-                "cardinality": { "enum": ["single", "multi"] },
+                "multi": { "type": "boolean" },
                 "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraint" } }
             },
             "oneOf": [

@@ -1,7 +1,8 @@
 use std::collections::VecDeque;
 use std::fs;
-use crate::*;
+
 use crate::generator::*;
+use crate::*;
 
 const TUPLE_TYPES_MAX_COUNT: usize = 4;
 
@@ -12,7 +13,7 @@ pub struct TableEntry {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
+#[serde(tag = "kind", rename_all = "lowercase")]
 pub enum TableSchema {
     Concrete(ConcreteTableSchema),
     Abstract(AbstractTableSchema),
@@ -43,24 +44,31 @@ pub trait TableSchematic {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Field {
     pub name: String,
-    #[serde(flatten)] pub kind: FieldKind,
-    // #[serde(default)] pub desc: Option<String>,
-    #[serde(default)] pub optional: Option<bool>,
-    #[serde(default)] pub multi: Option<bool>,
-    #[serde(default)] pub constraints: Option<Vec<Constraint>>,
+    pub target: Target,
+    #[serde(flatten)]
+    pub kind: FieldKind,
+    #[serde(default)]
+    pub optional: Option<bool>,
+    #[serde(default)]
+    pub multi: Option<bool>,
+    #[serde(default)]
+    pub constraints: Option<Vec<Constraint>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum FieldKind {
     Scalar {
-        #[serde(rename = "type")] scalar_type: ScalarAllType
+        #[serde(rename = "type")]
+        scalar_type: ScalarAllType,
     },
     Enum {
-        #[serde(rename = "type")] enum_type: String
+        #[serde(rename = "type")]
+        enum_type: String,
     },
     Link {
-        #[serde(rename = "type")] link_type: String
+        #[serde(rename = "type")]
+        link_type: String,
     },
     Tuple {
         types: Vec<FieldKind>,
@@ -72,9 +80,16 @@ pub enum FieldKind {
 pub enum ScalarAllType {
     Id,
     Bool,
-    Int8, Int16, Int32, Int64,
-    Uint8, Uint16, Uint32, Uint64,
-    Float32, Float64,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    Uint8,
+    Uint16,
+    Uint32,
+    Uint64,
+    Float32,
+    Float64,
     String,
     Datetime,
     Duration,
@@ -83,34 +98,28 @@ pub enum ScalarAllType {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Constraint {
-    Exclusive
+    Unique,
+    Max(i32),
+    Min(i32),
 }
 
-
 impl Generator {
-    pub fn generate_table(
-        &self,
-        table: &TableEntry
-    ) -> Result<(), Error> {
+    pub fn generate_table(&self, table: &TableEntry) -> Result<(), Error> {
         let table_file = self
             .full_gen_dir(&table.name.parent_namespace())
             .join(format!("{}.rs", table.name.as_entity()));
         self.log(&format!("Generating table `{}`", table_file.display()));
 
         let code = match &table.schema {
-            TableSchema::Concrete(schema) => {
-                self.generate_concrete_table(&table.name, schema)?
-            }
-            TableSchema::Abstract(schema) => {
-                self.generate_abstract_table(&table.name, schema)?
-            }
+            TableSchema::Concrete(schema) => self.generate_concrete_table(&table.name, schema)?,
+            TableSchema::Abstract(schema) => self.generate_abstract_table(&table.name, schema)?,
         };
 
         fs::write(table_file, code)?;
 
         Ok(())
     }
-    
+
     fn generate_concrete_table(
         &self,
         name: &Name,
@@ -119,37 +128,96 @@ impl Generator {
         let mut field_names = Vec::new();
         let mut field_parses = Vec::new();
         let mut field_definitions = Vec::new();
+        let mut constraint_inits = Vec::new();
+        let mut constraint_checks = Vec::new();
         let mut link_inits = Vec::new();
 
         let fields = self.get_table_all_fields(schema)?;
         for (index, field) in fields.iter().enumerate() {
+            if !field.target.is_target() {
+                continue;
+            }
+
             let is_optional = field.optional.unwrap_or(false);
             let is_multi = field.multi.unwrap_or(false);
 
             if is_optional && is_multi {
-                return Err(Error::InvalidAttribute("Optional and multi cannot be both true".to_string()))
+                return Err(Error::InvalidAttribute(
+                    "Optional and multi cannot be both true".to_string(),
+                ));
             }
 
             let field_name = &field.name;
             field_names.push(field_name.clone());
 
-            field_definitions.push(format!(
-                "{TAB}pub {}: {},",
-                field.name,
-                {
-                    let base_type = field.kind.to_rust_type();
-                    let multi_type = if is_multi { format!("Vec<{}>", base_type) } else { base_type };
-                    if is_optional { format!("Option<{}>", multi_type) } else { multi_type }
-                },
-            ));
+            let mut is_unique = false;
+            if let Some(constraints) = &field.constraints {
+                for constraint in constraints {
+                    match constraint {
+                        Constraint::Unique => {
+                            let set_name = format!("{field_name}_set");
+
+                            constraint_inits.push(format!(
+                                "{TAB}{TAB}let mut {set_name} = std::collections::HashSet::<{}>::new();",
+                                field.kind.to_rust_type(),
+                            ));
+                            constraint_checks.push(format!(
+                                r#"{TAB}{TAB}{TAB}if !{set_name}.insert(object.{field_name}.clone()) {{
+                return Err(Error::Constraint {{
+                    workbook: "{workbook}",
+                    sheet: "{sheet}",
+                    row: index + 1,
+                    column: "{field_name}",
+                    error: ConstraintError::Unique {{
+                        type_name: std::any::type_name::<{field_type}>(),
+                        value: object.{field_name}.to_string(),
+                    }}
+                }});
+            }}"#,
+                                field_type = field.kind.to_rust_type(),
+                                workbook = schema.workbook,
+                                sheet = schema.sheet,
+                            ));
+                            is_unique = true;
+                        }
+                        Constraint::Max(_) => {}
+                        Constraint::Min(_) => {}
+                    }
+                }
+            }
+
+            if is_multi && is_unique {
+                return Err(Error::InvalidAttribute(
+                    "Multi field cannot have unique constraint".to_string(),
+                ));
+            }
+
+            field_definitions.push(format!("{TAB}pub {}: {},", field.name, {
+                let base_type = field.kind.to_rust_type();
+                let multi_type = if is_multi {
+                    format!("Vec<{}>", base_type)
+                } else {
+                    base_type
+                };
+                if is_optional {
+                    format!("Option<{}>", multi_type)
+                } else {
+                    multi_type
+                }
+            },));
 
             let field_parse = if is_optional {
-                format!("{TAB}{TAB}let {field_name} = parse_optional(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;")
-            }
-            else if is_multi {
-                format!("{TAB}{TAB}let {field_name} = parse_multi(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;")
+                format!(
+                    "{TAB}{TAB}let {field_name} = parse_optional(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;"
+                )
+            } else if is_multi {
+                format!(
+                    "{TAB}{TAB}let {field_name} = parse_multi(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;"
+                )
             } else {
-                format!("{TAB}{TAB}let {field_name} = parse(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;")
+                format!(
+                    "{TAB}{TAB}let {field_name} = parse(&row[{index}]).map_err(|e| (\"{field_name}\", e))?;"
+                )
             };
             field_parses.push(field_parse);
 
@@ -161,8 +229,10 @@ impl Generator {
             let link_init = if is_optional {
                 let link_init = match &field.kind {
                     FieldKind::Link { .. } => {
-                        format!("{TAB}{TAB}{TAB}{TAB}{TAB}{field_name}.init().map_err(|e| (*id, e))?;")
-                    },
+                        format!(
+                            "{TAB}{TAB}{TAB}{TAB}{TAB}{field_name}.init().map_err(|e| (*id, e))?;"
+                        )
+                    }
                     FieldKind::Tuple { types } => {
                         let mut inner_link_inits = Vec::new();
                         for (i, item) in types.iter().enumerate() {
@@ -174,7 +244,7 @@ impl Generator {
                             inner_link_inits.push(format!("{TAB}{TAB}{TAB}{TAB}{field_name}.{i}.init().map_err(|e| (*id, e))?;"));
                         }
                         inner_link_inits.join("\n")
-                    },
+                    }
                     _ => panic!("Invalid field type"),
                 };
 
@@ -187,7 +257,7 @@ impl Generator {
                 let link_init = match &field.kind {
                     FieldKind::Link { .. } => {
                         format!("{TAB}{TAB}{TAB}{TAB}{TAB}x.init().map_err(|e| (*id, e))?;")
-                    },
+                    }
                     FieldKind::Tuple { types } => {
                         let mut inner_link_inits = Vec::new();
                         for (i, item) in types.iter().enumerate() {
@@ -196,10 +266,12 @@ impl Generator {
                                 _ => continue,
                             }
 
-                            inner_link_inits.push(format!("{TAB}{TAB}{TAB}{TAB}{TAB}x.{i}.init().map_err(|e| (*id, e))?;"));
+                            inner_link_inits.push(format!(
+                                "{TAB}{TAB}{TAB}{TAB}{TAB}x.{i}.init().map_err(|e| (*id, e))?;"
+                            ));
                         }
                         inner_link_inits.join("\n")
-                    },
+                    }
                     _ => panic!("Invalid field type"),
                 };
 
@@ -211,8 +283,10 @@ impl Generator {
             } else {
                 match &field.kind {
                     FieldKind::Link { .. } => {
-                        format!("{TAB}{TAB}{TAB}{TAB}row.{field_name}.init().map_err(|e| (*id, e))?;")
-                    },
+                        format!(
+                            "{TAB}{TAB}{TAB}{TAB}row.{field_name}.init().map_err(|e| (*id, e))?;"
+                        )
+                    }
                     FieldKind::Tuple { types } => {
                         let mut inner_link_inits = Vec::new();
                         for (i, item) in types.iter().enumerate() {
@@ -221,7 +295,9 @@ impl Generator {
                                 _ => continue,
                             }
 
-                            inner_link_inits.push(format!("{TAB}{TAB}{TAB}row.{field_name}.{i}.init().map_err(|e| (*id, e))?;"));
+                            inner_link_inits.push(format!(
+                                "{TAB}{TAB}{TAB}row.{field_name}.{i}.init().map_err(|e| (*id, e))?;"
+                            ));
                         }
                         inner_link_inits.join("\n")
                     }
@@ -232,20 +308,16 @@ impl Generator {
             link_inits.push(link_init);
         }
 
-        let fields_count = fields.len();
-
         // Generate codes
         let data_cell_name = name.as_data_type_cell();
         let data_type_name = name.as_data_type(false);
         let table_type_name = name.as_type(false);
-        
+
         let field_definitions_code = field_definitions.join("\n");
         let field_parses_code = field_parses.join("\n");
         let field_passes_code = field_names
             .iter()
-            .map(|name| {
-                format!("{TAB}{TAB}{TAB}{name},")
-            })
+            .map(|name| format!("{TAB}{TAB}{TAB}{name},"))
             .collect::<Vec<_>>()
             .join("\n");
 
@@ -267,7 +339,7 @@ impl Generator {
             String::new()
         } else {
             format!(
-r#"
+                r#"
         (|| {{
             for (id, row) in &mut unsafe {{ {data_cell_name}.assume_init_mut() }}.data {{
 {inits_code}
@@ -288,7 +360,7 @@ r#"
         };
 
         Ok(format!(
-r#"{GENERATED_FILE_WARNING}
+            r#"{GENERATED_FILE_WARNING}
 #![allow(static_mut_refs)]
 
 use std::collections::HashMap;
@@ -311,7 +383,7 @@ impl {table_type_name} {{
     fn parse(row: &[calamine::Data]) -> Result<(DataId, Self), (&'static str, ParseError)> {{
         const FIELDS_COUNT: usize = {fields_count};
 
-        if row.len() != FIELDS_COUNT {{
+        if row.len() < FIELDS_COUNT {{
             return Err(("", ParseError::InvalidColumnCount {{ expected: FIELDS_COUNT, actual: row.len() }}));
         }}
 
@@ -343,6 +415,8 @@ impl {CRATE_PREFIX}::Loadable for {data_type_name} {{
     async fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {{
         let mut objects = HashMap::new();
         let mut index = {HEADER_ROWS};
+{constraint_inits_code}
+
         for row in rows {{
             let (id, object) = {table_type_name}::parse(row)
                 .map_err(|(column, error)| Error::Parse {{
@@ -361,9 +435,10 @@ impl {CRATE_PREFIX}::Loadable for {data_type_name} {{
                     b: format!("{{:?}}", object),
                 }});
             }}
+{constraint_checks_code}
 
             objects.insert(id, object);
-            
+
             index += 1;
         }}
 
@@ -379,9 +454,12 @@ impl {CRATE_PREFIX}::Loadable for {data_type_name} {{
     }}
 }}
 "#,
-        workbook = schema.workbook,
-        sheet = schema.sheet,
-    ))
+            workbook = schema.workbook,
+            sheet = schema.sheet,
+            fields_count = fields.len(),
+            constraint_inits_code = constraint_inits.join("\n"),
+            constraint_checks_code = constraint_checks.join("\n"),
+        ))
     }
 
     fn generate_abstract_table(
@@ -403,8 +481,7 @@ impl {CRATE_PREFIX}::Loadable for {data_type_name} {{
 
             child_types.push(format!(
                 "{TAB}{}(&'static {CRATE_PREFIX}::{}),",
-                child_name,
-                child_full_name,
+                child_name, child_full_name,
             ));
 
             child_id_matches.push(format!(
@@ -420,7 +497,7 @@ impl {CRATE_PREFIX}::Loadable for {data_type_name} {{
             let parent_full_name = parent.name.as_type(true);
 
             format!(
-r#"
+                r#"
 
         {CRATE_PREFIX}::{parent_full_name}Data::insert(id, {CRATE_PREFIX}::{parent_full_name}::{table_type_name}(&data[id])).await?;"#
             )
@@ -510,7 +587,8 @@ impl {data_type_name} {{
         let mut extend = schema.extend().clone();
 
         while let Some(parent) = extend.take() {
-            let parent_index = self.table_indices
+            let parent_index = self
+                .table_indices
                 .get(&parent)
                 .ok_or_else(|| Error::Inheritance(schema.name().to_owned(), parent))?;
             let parent_table = &self.tables[*parent_index];
@@ -537,15 +615,27 @@ impl TableSchema {
 }
 
 impl TableSchematic for ConcreteTableSchema {
-    fn name(&self) -> &str { &self.name }
-    fn fields(&self) -> &Vec<Field> { &self.fields }
-    fn extend(&self) -> &Option<String> { &self.extend }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn fields(&self) -> &Vec<Field> {
+        &self.fields
+    }
+    fn extend(&self) -> &Option<String> {
+        &self.extend
+    }
 }
 
 impl TableSchematic for AbstractTableSchema {
-    fn name(&self) -> &str { &self.name }
-    fn fields(&self) -> &Vec<Field> { &self.fields }
-    fn extend(&self) -> &Option<String> { &self.extend }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn fields(&self) -> &Vec<Field> {
+        &self.fields
+    }
+    fn extend(&self) -> &Option<String> {
+        &self.extend
+    }
 }
 
 impl FieldKind {
@@ -567,17 +657,18 @@ impl FieldKind {
                 ScalarAllType::String => "String",
                 ScalarAllType::Datetime => "chrono::DateTime",
                 ScalarAllType::Duration => "chrono::Duration",
-            }.to_string(),
+            }
+            .to_string(),
             FieldKind::Enum { enum_type } => {
                 format!("{CRATE_PREFIX}::{enum_type}")
-            },
+            }
             FieldKind::Link { link_type } => {
                 format!("Link<{CRATE_PREFIX}::{link_type}>")
-            },
+            }
             FieldKind::Tuple { types } => {
                 let type_strings = to_tuple_type_strings(types);
                 format!("({})", type_strings.join(", "))
-            },
+            }
         }
     }
 
@@ -620,7 +711,10 @@ fn to_tuple_type_strings(fields: &[FieldKind]) -> Vec<String> {
         panic!("Tuples must have at least two fields");
     }
     if type_strings.len() > TUPLE_TYPES_MAX_COUNT {
-        panic!("Tuples with more than {} types are not supported", TUPLE_TYPES_MAX_COUNT);
+        panic!(
+            "Tuples with more than {} types are not supported",
+            TUPLE_TYPES_MAX_COUNT
+        );
     }
 
     type_strings

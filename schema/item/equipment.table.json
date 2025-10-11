@@ -1,6 +1,6 @@
 {
     "name": "Equipment",
-    "type": "abstract",
+    "kind": "abstract",
     "extend": "item::Item",
     "fields": [
         {

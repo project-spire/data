@@ -1,6 +1,6 @@
 {
     "name": "RandomBox",
-    "type": "concrete",
+    "kind": "concrete",
     "extend": "item::Item",
     "workbook": "random_box.ods",
     "sheet": "RandomBox",
