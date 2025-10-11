@@ -1,5 +1,7 @@
 pub mod data;
+
 pub use crate::data::*;
+use std::cmp::Ordering;
 
 mod error;
 mod parse;
@@ -43,6 +45,12 @@ impl Deref for DataId {
     }
 }
 
+impl PartialEq<u32> for DataId {
+    fn eq(&self, other: &u32) -> bool {
+        self.0 == *other
+    }
+}
+
 impl<T: Linkable> Clone for Link<T> {
     fn clone(&self) -> Self {
         Self {
@@ -63,6 +71,18 @@ impl<T: Linkable> Deref for Link<T> {
 
     fn deref(&self) -> &Self::Target {
         unsafe { self.target.assume_init_ref() }
+    }
+}
+
+impl<T: Linkable> PartialEq<u32> for Link<T> {
+    fn eq(&self, other: &u32) -> bool {
+        self.id == *other
+    }
+}
+
+impl<T: Linkable> PartialOrd<u32> for Link<T> {
+    fn partial_cmp(&self, other: &u32) -> Option<Ordering> {
+        self.id.partial_cmp(other)
     }
 }
 

@@ -97,4 +97,18 @@ pub enum ConstraintError {
         type_name: &'static str,
         value: String,
     },
+
+    #[error("Value [{type_name}] {actual} is higher than max value {expected}")]
+    Max {
+        type_name: &'static str,
+        expected: String,
+        actual: String,
+    },
+
+    #[error("Value [{type_name}] {actual} is lower than min value {expected}")]
+    Min {
+        type_name: &'static str,
+        expected: String,
+        actual: String,
+    },
 }

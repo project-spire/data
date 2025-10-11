@@ -60,7 +60,6 @@ impl crate::Loadable for RandomBoxData {
         let mut objects = HashMap::new();
         let mut index = 2;
 
-
         for row in rows {
             let (id, object) = RandomBox::parse(row)
                 .map_err(|(column, error)| Error::Parse {
@@ -79,7 +78,6 @@ impl crate::Loadable for RandomBoxData {
                     b: format!("{:?}", object),
                 });
             }
-
 
             objects.insert(id, object);
 

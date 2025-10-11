@@ -163,25 +163,39 @@ impl Generator {
                             ));
                             constraint_checks.push(format!(
                                 r#"{TAB}{TAB}{TAB}if !{set_name}.insert(object.{field_name}.clone()) {{
-                return Err(Error::Constraint {{
-                    workbook: "{workbook}",
-                    sheet: "{sheet}",
-                    row: index + 1,
-                    column: "{field_name}",
-                    error: ConstraintError::Unique {{
-                        type_name: std::any::type_name::<{field_type}>(),
-                        value: object.{field_name}.to_string(),
-                    }}
-                }});
+                return Err(("{field_name}", ConstraintError::Unique {{
+                    type_name: std::any::type_name::<{field_type}>(),
+                    value: object.{field_name}.to_string(),
+                }}));
             }}"#,
                                 field_type = field.kind.to_rust_type(),
-                                workbook = schema.workbook,
-                                sheet = schema.sheet,
                             ));
                             is_unique = true;
                         }
-                        Constraint::Max(_) => {}
-                        Constraint::Min(_) => {}
+                        Constraint::Max(value) => {
+                            constraint_checks.push(format!(
+                                r#"{TAB}{TAB}{TAB}if object.{field_name} > {value} {{
+                return Err(("{field_name}", ConstraintError::Max {{
+                    type_name: std::any::type_name::<{field_type}>(),
+                    expected: {value}.to_string(),
+                    actual: object.{field_name}.to_string(),
+                }}));
+            }}"#,
+                                field_type = field.kind.to_rust_type(),
+                            ));
+                        }
+                        Constraint::Min(value) => {
+                            constraint_checks.push(format!(
+                                r#"{TAB}{TAB}{TAB}if object.{field_name} < {value} {{
+                return Err(("{field_name}", ConstraintError::Min {{
+                    type_name: std::any::type_name::<{field_type}>(),
+                    expected: {value}.to_string(),
+                    actual: object.{field_name}.to_string(),
+                }}));
+            }}"#,
+                                field_type = field.kind.to_rust_type(),
+                            ));
+                        }
                     }
                 }
             }
@@ -359,6 +373,43 @@ impl Generator {
             )
         };
 
+        let constraint_function_code = if constraint_checks.is_empty() {
+            String::new()
+        } else {
+            format!(
+                r#"
+{constraint_inits_code}
+
+        let mut check_constraint = |object: &{table_type_name}| -> Result<(), (&'static str, ConstraintError)> {{
+{constraint_checks_code}
+
+            Ok(())
+        }};
+"#,
+                constraint_inits_code = constraint_inits.join("\n"),
+                constraint_checks_code = constraint_checks.join("\n\n"),
+            )
+        };
+
+        let constraint_call_code = if constraint_checks.is_empty() {
+            String::new()
+        } else {
+            format!(
+                r#"
+
+            check_constraint(&object)
+                .map_err(|(column, error)| Error::Constraint {{
+                    workbook: "{workbook}",
+                    sheet: "{sheet}",
+                    row: index + 1,
+                    column,
+                    error,
+                }})?;"#,
+                workbook = schema.workbook,
+                sheet = schema.sheet,
+            )
+        };
+
         Ok(format!(
             r#"{GENERATED_FILE_WARNING}
 #![allow(static_mut_refs)]
@@ -415,8 +466,7 @@ impl {CRATE_PREFIX}::Loadable for {data_type_name} {{
     async fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {{
         let mut objects = HashMap::new();
         let mut index = {HEADER_ROWS};
-{constraint_inits_code}
-
+{constraint_function_code}
         for row in rows {{
             let (id, object) = {table_type_name}::parse(row)
                 .map_err(|(column, error)| Error::Parse {{
@@ -434,8 +484,7 @@ impl {CRATE_PREFIX}::Loadable for {data_type_name} {{
                     a: format!("{{:?}}", objects[&id]),
                     b: format!("{{:?}}", object),
                 }});
-            }}
-{constraint_checks_code}
+            }}{constraint_call_code}
 
             objects.insert(id, object);
 
@@ -457,8 +506,6 @@ impl {CRATE_PREFIX}::Loadable for {data_type_name} {{
             workbook = schema.workbook,
             sheet = schema.sheet,
             fields_count = fields.len(),
-            constraint_inits_code = constraint_inits.join("\n"),
-            constraint_checks_code = constraint_checks.join("\n"),
         ))
     }
 

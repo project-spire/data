@@ -65,7 +65,27 @@ impl crate::Loadable for LinkTestData {
     async fn load(rows: &[&[calamine::Data]]) -> Result<(), Error> {
         let mut objects = HashMap::new();
         let mut index = 2;
+
         let mut exclusive_max5_item_link_set = std::collections::HashSet::<Link<crate::item::Item>>::new();
+
+        let mut check_constraint = |object: &LinkTest| -> Result<(), (&'static str, ConstraintError)> {
+            if !exclusive_max5_item_link_set.insert(object.exclusive_max5_item_link.clone()) {
+                return Err(("exclusive_max5_item_link", ConstraintError::Unique {
+                    type_name: std::any::type_name::<Link<crate::item::Item>>(),
+                    value: object.exclusive_max5_item_link.to_string(),
+                }));
+            }
+
+            if object.exclusive_max5_item_link > 5 {
+                return Err(("exclusive_max5_item_link", ConstraintError::Max {
+                    type_name: std::any::type_name::<Link<crate::item::Item>>(),
+                    expected: 5.to_string(),
+                    actual: object.exclusive_max5_item_link.to_string(),
+                }));
+            }
+
+            Ok(())
+        };
 
         for row in rows {
             let (id, object) = LinkTest::parse(row)
@@ -85,18 +105,15 @@ impl crate::Loadable for LinkTestData {
                     b: format!("{:?}", object),
                 });
             }
-            if !exclusive_max5_item_link_set.insert(object.exclusive_max5_item_link.clone()) {
-                return Err(Error::Constraint {
+
+            check_constraint(&object)
+                .map_err(|(column, error)| Error::Constraint {
                     workbook: "link_test.ods",
                     sheet: "LinkTest",
                     row: index + 1,
-                    column: "exclusive_max5_item_link",
-                    error: ConstraintError::Unique {
-                        type_name: std::any::type_name::<Link<crate::item::Item>>(),
-                        value: object.exclusive_max5_item_link.to_string(),
-                    }
-                });
-            }
+                    column,
+                    error,
+                })?;
 
             objects.insert(id, object);
 

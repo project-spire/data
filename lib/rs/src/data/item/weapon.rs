@@ -63,7 +63,6 @@ impl crate::Loadable for WeaponData {
         let mut objects = HashMap::new();
         let mut index = 2;
 
-
         for row in rows {
             let (id, object) = Weapon::parse(row)
                 .map_err(|(column, error)| Error::Parse {
@@ -82,7 +81,6 @@ impl crate::Loadable for WeaponData {
                     b: format!("{:?}", object),
                 });
             }
-
 
             objects.insert(id, object);
 
