@@ -1,22 +1,21 @@
 pub mod data;
 pub use crate::data::*;
-pub(crate) use parse::*;
 
-mod parse;
 mod error;
+mod parse;
 
+use crate::error::{Error, LinkError};
 use std::fmt::Formatter;
 use std::mem::MaybeUninit;
 use std::ops::Deref;
-use crate::error::{Error, LinkError};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct DataId(u32);
 
 #[derive(Debug)]
-pub struct Link<'a, T: Linkable> {
+pub struct Link<T: Linkable + 'static> {
     id: DataId,
-    target: MaybeUninit<&'a T>,
+    target: MaybeUninit<&'static T>,
 }
 
 pub trait Linkable: Sized {
@@ -42,7 +41,7 @@ impl Deref for DataId {
     }
 }
 
-impl<'a, T: Linkable> Deref for Link<'a, T> {
+impl<T: Linkable> Deref for Link<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -50,14 +49,16 @@ impl<'a, T: Linkable> Deref for Link<'a, T> {
     }
 }
 
-impl<'a, T: Linkable + 'static> Link<'a, T> {
+impl<T: Linkable + 'static> Link<T> {
     pub(crate) fn init(&mut self) -> Result<(), LinkError> {
         let target = match T::get(&self.id) {
             Some(target) => target,
-            None => return Err(LinkError::Missing {
-                type_name: std::any::type_name::<T>(),
-                id: self.id,
-            }),
+            None => {
+                return Err(LinkError::Missing {
+                    type_name: std::any::type_name::<T>(),
+                    id: self.id,
+                });
+            }
         };
 
         self.target.write(target);

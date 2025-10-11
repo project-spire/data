@@ -11,9 +11,9 @@ static mut LINK_TEST_DATA: MaybeUninit<LinkTestData> = MaybeUninit::uninit();
 #[derive(Debug)]
 pub struct LinkTest {
     pub id: DataId,
-    pub item_link: Link<'static, crate::item::Item>,
-    pub optional_item_link: Option<Link<'static, crate::item::Item>>,
-    pub multi_item_link: Vec<Link<'static, crate::item::Item>>,
+    pub item_link: Link<crate::item::Item>,
+    pub optional_item_link: Option<Link<crate::item::Item>>,
+    pub multi_item_link: Vec<Link<crate::item::Item>>,
 }
 
 pub struct LinkTestData {

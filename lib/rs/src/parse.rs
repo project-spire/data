@@ -1,7 +1,7 @@
+use crate::{DataId, Link, Linkable, error::ParseError};
 use calamine::DataType;
 use std::mem::MaybeUninit;
 use std::str::FromStr;
-use crate::{DataId, Link, Linkable, error::ParseError};
 
 pub(crate) trait Parsable: Sized {
     fn parse(value: &calamine::Data) -> Result<Self, ParseError>;
@@ -9,15 +9,11 @@ pub(crate) trait Parsable: Sized {
     fn parse_string(s: &str) -> Result<Self, ParseError>;
 }
 
-pub(crate) fn parse<T: Parsable>(
-    value: &calamine::Data,
-) -> Result<T, ParseError> {
+pub(crate) fn parse<T: Parsable>(value: &calamine::Data) -> Result<T, ParseError> {
     Ok(T::parse(value)?)
 }
 
-pub(crate) fn parse_optional<T: Parsable>(
-    value: &calamine::Data,
-) -> Result<Option<T>, ParseError> {
+pub(crate) fn parse_optional<T: Parsable>(value: &calamine::Data) -> Result<Option<T>, ParseError> {
     if value.is_empty() {
         return Ok(None);
     }
@@ -25,21 +21,20 @@ pub(crate) fn parse_optional<T: Parsable>(
     Ok(Some(T::parse(value)?))
 }
 
-pub(crate) fn parse_multi<T: Parsable>(
-    value: &calamine::Data,
-) -> Result<Vec<T>, ParseError> {
+pub(crate) fn parse_multi<T: Parsable>(value: &calamine::Data) -> Result<Vec<T>, ParseError> {
     let s = match value.get_string() {
         Some(s) => s.trim(),
-        None => return Err(ParseError::InvalidFormat {
-            type_name: "array",
-            expected: "string",
-            actual: value.to_string(),
-        }),
-    }.trim();
+        None => {
+            return Err(ParseError::InvalidFormat {
+                type_name: "array",
+                expected: "string",
+                actual: value.to_string(),
+            });
+        }
+    }
+    .trim();
 
-    if s.len() < 2
-        || s.chars().nth(0).unwrap() != '['
-        || s.chars().nth_back(0).unwrap() != ']' {
+    if s.len() < 2 || s.chars().nth(0).unwrap() != '[' || s.chars().nth_back(0).unwrap() != ']' {
         return Err(ParseError::InvalidFormat {
             type_name: "array",
             expected: "wrappers",
@@ -79,27 +74,27 @@ pub(crate) fn parse_multi<T: Parsable>(
     Ok(result
         .iter()
         .map(|s| T::parse_string(&s))
-        .collect::<Result<Vec<_>, _>>()?
-    )
+        .collect::<Result<Vec<_>, _>>()?)
 }
 
 fn parse_tuple(value: &calamine::Data, count: usize) -> Result<Vec<&str>, ParseError> {
     let s = match value.get_string() {
         Some(s) => s.trim(),
-        None => return Err(ParseError::InvalidFormat {
-            type_name: "tuple",
-            expected: "string",
-            actual: value.to_string(),
-        }),
-    }.trim();
+        None => {
+            return Err(ParseError::InvalidFormat {
+                type_name: "tuple",
+                expected: "string",
+                actual: value.to_string(),
+            });
+        }
+    }
+    .trim();
 
     parse_tuple_string(s, count)
 }
 
 fn parse_tuple_string(s: &str, count: usize) -> Result<Vec<&str>, ParseError> {
-    if s.len() < 2
-        || s.chars().nth(0).unwrap() != '('
-        || s.chars().nth_back(0).unwrap() != ')' {
+    if s.len() < 2 || s.chars().nth(0).unwrap() != '(' || s.chars().nth_back(0).unwrap() != ')' {
         return Err(ParseError::InvalidFormat {
             type_name: "tuple",
             expected: "wrappers",
@@ -161,7 +156,7 @@ fn string_to_float<T: FromStr>(s: &str) -> Result<T, ParseError> {
 fn check_range<T: Into<i64>>(value: i64, min: T, max: T) -> Result<(), ParseError> {
     let (min, max) = (min.into(), max.into());
     if min <= value && value <= max {
-        return Ok(())
+        return Ok(());
     }
 
     Err(ParseError::OutOfRange {
@@ -335,7 +330,7 @@ impl Parsable for bool {
     }
 }
 
-impl<T: 'static + Linkable> Parsable for Link<'static, T> {
+impl<T: 'static + Linkable> Parsable for Link<T> {
     fn parse(value: &calamine::Data) -> Result<Self, ParseError> {
         let id = DataId::parse(value)?;
         let target = MaybeUninit::uninit();
@@ -355,11 +350,13 @@ impl Parsable for String {
     fn parse(value: &calamine::Data) -> Result<Self, ParseError> {
         let s = match value.get_string() {
             Some(s) => s,
-            None => return Err(ParseError::InvalidFormat {
-                type_name: std::any::type_name::<String>(),
-                expected: "string",
-                actual: value.to_string(),
-            }),
+            None => {
+                return Err(ParseError::InvalidFormat {
+                    type_name: std::any::type_name::<String>(),
+                    expected: "string",
+                    actual: value.to_string(),
+                });
+            }
         };
 
         Ok(s.trim().to_owned())

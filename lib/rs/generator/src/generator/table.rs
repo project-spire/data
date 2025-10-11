@@ -572,7 +572,7 @@ impl FieldKind {
                 format!("{CRATE_PREFIX}::{enum_type}")
             },
             FieldKind::Link { link_type } => {
-                format!("Link<'static, {CRATE_PREFIX}::{link_type}>")
+                format!("Link<{CRATE_PREFIX}::{link_type}>")
             },
             FieldKind::Tuple { types } => {
                 let type_strings = to_tuple_type_strings(types);

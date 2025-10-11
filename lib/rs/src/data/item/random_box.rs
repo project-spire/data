@@ -12,7 +12,7 @@ static mut RANDOM_BOX_DATA: MaybeUninit<RandomBoxData> = MaybeUninit::uninit();
 pub struct RandomBox {
     pub id: DataId,
     pub name: String,
-    pub items: Vec<(Link<'static, crate::item::Item>, u16)>,
+    pub items: Vec<(Link<crate::item::Item>, u16)>,
 }
 
 pub struct RandomBoxData {
