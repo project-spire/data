@@ -5,6 +5,7 @@ pub(crate) mod table;
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
+
 use crate::*;
 use self::constant::ConstantEntry;
 use self::enumeration::EnumerationEntry;

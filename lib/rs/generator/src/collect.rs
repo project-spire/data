@@ -1,12 +1,11 @@
-use std::collections::{HashMap, VecDeque};
-use std::fs;
-use std::path::{Path, PathBuf};
-use glob::glob;
-use crate::*;
 use crate::generator::constant::*;
 use crate::generator::enumeration::*;
 use crate::generator::module::*;
 use crate::generator::table::*;
+use crate::*;
+use glob::glob;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 impl Generator {
     pub fn collect(&mut self) -> Result<(), Error> {
@@ -19,7 +18,9 @@ impl Generator {
             let child_modules = self.collect_module(&mut module)?;
 
             for i in 0..child_modules.len() {
-                module.entries.push(EntityEntry::ModuleIndex(self.modules.len() + i + 1));
+                module
+                    .entries
+                    .push(EntityEntry::ModuleIndex(self.modules.len() + i + 1));
             }
 
             next_modules.extend(child_modules);
@@ -31,10 +32,7 @@ impl Generator {
         Ok(())
     }
 
-    fn collect_module(
-        &mut self,
-        module: &mut ModuleEntry,
-    ) -> Result<Vec<ModuleEntry>, Error> {
+    fn collect_module(&mut self, module: &mut ModuleEntry) -> Result<Vec<ModuleEntry>, Error> {
         let module_dir = module.name.as_full_dir(&self.config.schema_dir);
         self.log(&format!("Collecting module `{}`", &module_dir.display()));
 
@@ -59,13 +57,13 @@ impl Generator {
             match components[1] {
                 "table" => {
                     self.collect_table(module, &entity_file, entity_name)?;
-                },
+                }
                 "enum" => {
                     self.collect_enumeration(module, &entity_file, entity_name)?;
-                },
+                }
                 "const" => {
                     self.collect_constant(module, &entity_file, entity_name)?;
-                },
+                }
                 _ => {
                     return Err(Error::InvalidFileName(file_name.to_owned()));
                 }
@@ -106,9 +104,9 @@ impl Generator {
         let schema: TableSchema = serde_json::from_str(&fs::read_to_string(file)?)?;
 
         self.tables.push(TableEntry { name, schema });
-        module.entries.push(EntityEntry::TableIndex(
-            self.tables.len() - 1
-        ));
+        module
+            .entries
+            .push(EntityEntry::TableIndex(self.tables.len() - 1));
 
         self.table_indices.insert(type_name, self.tables.len() - 1);
 
@@ -127,13 +125,10 @@ impl Generator {
 
         let schema: EnumerationSchema = serde_json::from_str(&fs::read_to_string(file)?)?;
 
-        self.enumerations.push(EnumerationEntry {
-            name,
-            schema,
-        });
-        module.entries.push(EntityEntry::EnumerationIndex(
-            self.enumerations.len() - 1
-        ));
+        self.enumerations.push(EnumerationEntry { name, schema });
+        module
+            .entries
+            .push(EntityEntry::EnumerationIndex(self.enumerations.len() - 1));
 
         Ok(())
     }
@@ -150,13 +145,10 @@ impl Generator {
 
         let schema: ConstantSchema = serde_json::from_str(&fs::read_to_string(file)?)?;
 
-        self.constants.push(ConstantEntry {
-            name,
-            schema,
-        });
-        module.entries.push(EntityEntry::ConstantIndex(
-            self.enumerations.len() - 1
-        ));
+        self.constants.push(ConstantEntry { name, schema });
+        module
+            .entries
+            .push(EntityEntry::ConstantIndex(self.enumerations.len() - 1));
 
         Ok(())
     }
@@ -186,7 +178,7 @@ impl Generator {
                 .unwrap()
                 .push(index);
         }
-        
+
         Ok(())
     }
 }
