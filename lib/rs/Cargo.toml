@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 protocol = { path = "../../../protocol/lib/rs" }
 
-calamine = "0.31"
+calamine = "0.32.0"
 sqlx = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
