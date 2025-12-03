@@ -1,0 +1,21 @@
+{
+    "$schema": "../../syntax/table.json",
+    "name": "PathNode",
+    "kind": "concrete",
+    "workbook": "weapon.ods",
+    "sheet": "Weapon",
+    "fields": [
+        {
+            "name": "id",
+            "kind": "scalar",
+            "type": "id",
+            "target": "all"
+        },
+        {
+            "name": "name",
+            "kind": "scalar",
+            "type": "string",
+            "target": "client"
+        }
+    ]
+}
