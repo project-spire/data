@@ -20,6 +20,7 @@ pub struct Config {
     pub src_dir: PathBuf,
     pub gen_dir: PathBuf,
     pub protocol_gen_dir: PathBuf,
+    pub sql_gen_dir: PathBuf,
 
     pub verbose: bool,
     pub dry_run: bool,

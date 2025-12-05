@@ -13,10 +13,11 @@
             "items": { "$ref": "#/$defs/attribute" }
         },
         "target": { "enum": ["client", "server", "all"] },
-        "desc": { "type": "string" }
+        "desc": { "type": "string" },
+        "protocol": { "type": "boolean" },
+        "queryable": { "type": "boolean" }
     },
     "required": ["name", "base", "enums", "target"],
-    "additionalProperties": false,
     "$defs": {
         "attribute": {
             "type": "object",

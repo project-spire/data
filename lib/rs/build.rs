@@ -7,6 +7,7 @@ fn main() {
         src_dir: PathBuf::from("../../src"),
         gen_dir: PathBuf::from("src/data"),
         protocol_gen_dir: PathBuf::from("../../../protocol/schema"),
+        sql_gen_dir: PathBuf::from("../../../db/schema/types"),
 
         verbose: true,
         dry_run: false,

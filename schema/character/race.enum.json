@@ -1,4 +1,5 @@
 {
+    "$schema": "../../syntax/enum.json",
     "name": "Race",
     "base": "uint16",
     "enums": [
@@ -8,14 +9,5 @@
     ],
     "target": "all",
     "protocol": true,
-    "attributes": [
-        {
-            "target": "server",
-            "attribute": "#[derive(Debug, Clone, Copy, PartialEq, sqlx::Type)]"
-        },
-        {
-            "target": "server",
-            "attribute": "#[sqlx(type_name = \"race\")]"
-        }
-    ]
+    "queryable": true
 }

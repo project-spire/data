@@ -1,9 +1,15 @@
 // This is a generated file. DO NOT MODIFY.
 use crate::error::ParseError;
 use crate::parse::*;
+use std::io::Write;
+use diesel::{AsExpression, FromSqlRow};
+use diesel::deserialize::FromSql;
+use diesel::pg::{Pg, PgValue};
+use diesel::serialize::{IsNull, Output, ToSql};
 
-#[derive(Debug, Clone, Copy, PartialEq, sqlx::Type)]
-#[sqlx(type_name = "race")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(FromSqlRow, AsExpression)]
+#[diesel(sql_type = db::schema::sql_types::Race)]
 pub enum Race {
     None,
     Human,
@@ -69,3 +75,28 @@ impl Into<Race> for protocol::Race {
     }
 }
 
+
+impl ToSql<db::schema::sql_types::Race, Pg> for Race {
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Pg>) -> diesel::serialize::Result {
+        match *self {
+            Self::None => out.write_all(b"none")?,
+            Self::Human => out.write_all(b"human")?,
+            Self::Orc => out.write_all(b"orc")?,
+        }
+        Ok(IsNull::No)
+    }
+}
+
+impl FromSql<db::schema::sql_types::Race, Pg> for Race {
+    fn from_sql(bytes: PgValue<'_>) -> diesel::deserialize::Result<Self> {
+        Ok(match bytes.as_bytes() {
+            b"none" => Self::None,
+            b"human" => Self::Human,
+            b"orc" => Self::Orc,
+             _ => return Err(format!(
+                "Unrecognized Race enum variant {}",
+                String::from_utf8_lossy(bytes.as_bytes()),
+            ).into()),
+        })
+    }
+}
