@@ -1,6 +1,5 @@
 pub mod schema;
 pub mod data;
-pub mod model;
 
 pub use crate::data::*;
 use std::cmp::Ordering;
