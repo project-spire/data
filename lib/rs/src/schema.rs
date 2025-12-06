@@ -28,6 +28,16 @@ diesel::table! {
 }
 
 diesel::table! {
+    character_path_node (character_id, data_id) {
+        character_id -> Int8,
+        is_active -> Bool,
+        level -> Int2,
+        data_id -> Int4,
+        exp -> Int4,
+    }
+}
+
+diesel::table! {
     dev_account (id) {
         #[max_length = 16]
         id -> Varchar,
@@ -37,6 +47,7 @@ diesel::table! {
 }
 
 diesel::joinable!(character -> account (account_id));
+diesel::joinable!(character_path_node -> character (character_id));
 diesel::joinable!(dev_account -> account (account_id));
 
-diesel::allow_tables_to_appear_in_same_query!(account, character, dev_account,);
+diesel::allow_tables_to_appear_in_same_query!(account, character, character_path_node, dev_account,);

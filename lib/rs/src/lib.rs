@@ -32,6 +32,18 @@ pub(crate) trait Loadable: Sized {
     fn init() -> Result<(), Error>;
 }
 
+impl From<i32> for DataId {
+    fn from(value: i32) -> Self {
+        Self(value as u32)
+    }
+}
+
+impl From<u32> for DataId {
+    fn from(value: u32) -> Self {
+        Self(value)
+    }
+}
+
 impl Display for DataId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "DataId({})", self.0)
