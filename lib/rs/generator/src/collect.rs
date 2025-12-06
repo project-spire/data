@@ -15,7 +15,7 @@ impl Generator {
         let mut next_modules = vec![base_module];
 
         while let Some(mut module) = next_modules.pop() {
-            let child_modules = self.collect_module(&mut module)?;
+            let child_modules = self.collect_module(&mut module, self.modules.len())?;
 
             for i in 0..child_modules.len() {
                 module
@@ -32,7 +32,7 @@ impl Generator {
         Ok(())
     }
 
-    fn collect_module(&mut self, module: &mut ModuleEntry) -> Result<Vec<ModuleEntry>, Error> {
+    fn collect_module(&mut self, module: &mut ModuleEntry, index: usize) -> Result<Vec<ModuleEntry>, Error> {
         let module_dir = module.name.as_full_dir(&self.config.schema_dir);
         self.log(&format!("Collecting module `{}`", &module_dir.display()));
 

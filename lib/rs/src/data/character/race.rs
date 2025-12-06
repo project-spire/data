@@ -9,7 +9,7 @@ use diesel::serialize::{IsNull, Output, ToSql};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[derive(FromSqlRow, AsExpression)]
-#[diesel(sql_type = db::schema::sql_types::Race)]
+#[diesel(sql_type = crate::schema::sql_types::Race)]
 pub enum Race {
     None,
     Human,
@@ -76,7 +76,7 @@ impl Into<Race> for protocol::Race {
 }
 
 
-impl ToSql<db::schema::sql_types::Race, Pg> for Race {
+impl ToSql<crate::schema::sql_types::Race, Pg> for Race {
     fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Pg>) -> diesel::serialize::Result {
         match *self {
             Self::None => out.write_all(b"none")?,
@@ -87,7 +87,7 @@ impl ToSql<db::schema::sql_types::Race, Pg> for Race {
     }
 }
 
-impl FromSql<db::schema::sql_types::Race, Pg> for Race {
+impl FromSql<crate::schema::sql_types::Race, Pg> for Race {
     fn from_sql(bytes: PgValue<'_>) -> diesel::deserialize::Result<Self> {
         Ok(match bytes.as_bytes() {
             b"none" => Self::None,

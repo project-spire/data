@@ -53,8 +53,9 @@ impl Generator {
         if enumeration.schema.queryable {
             code += &self.generate_queryable(&enumeration.name, &enumeration.schema)?;
         }
-
+        
         fs::write(enumeration_file, code)?;
+        
         Ok(())
     }
 
@@ -93,7 +94,7 @@ impl Generator {
 
             attributes.push("#[derive(FromSqlRow, AsExpression)]".into());
             attributes.push(format!(
-                "#[diesel(sql_type = db::schema::sql_types::{})]",
+                "#[diesel(sql_type = crate::schema::sql_types::{})]",
                 schema.name,
             ));
         }
@@ -214,7 +215,7 @@ impl Into<{enum_type_name}> for protocol::{enum_type_name} {{
         let mut from_sql_matches = Vec::new();
 
         for e in &schema.enums {
-            sql_enums.push(format!("{TAB}'{}'", e));
+            sql_enums.push(format!("{TAB}'{}'", e.to_snake_case()));
 
             to_sql_matches.push(format!(
                 "{TAB}{TAB}{TAB}Self::{e} => out.write_all(b\"{}\")?,",
@@ -247,7 +248,7 @@ create type {} as enum (
         fs::write(sql_file, sql)?;
 
         Ok(format!(r#"
-impl ToSql<db::schema::sql_types::{enum_type_name}, Pg> for {enum_type_name} {{
+impl ToSql<crate::schema::sql_types::{enum_type_name}, Pg> for {enum_type_name} {{
     fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Pg>) -> diesel::serialize::Result {{
         match *self {{
 {to_sql_matches_code}
@@ -256,7 +257,7 @@ impl ToSql<db::schema::sql_types::{enum_type_name}, Pg> for {enum_type_name} {{
     }}
 }}
 
-impl FromSql<db::schema::sql_types::{enum_type_name}, Pg> for {enum_type_name} {{
+impl FromSql<crate::schema::sql_types::{enum_type_name}, Pg> for {enum_type_name} {{
     fn from_sql(bytes: PgValue<'_>) -> diesel::deserialize::Result<Self> {{
         Ok(match bytes.as_bytes() {{
 {from_sql_matches_code}

@@ -86,15 +86,16 @@ impl Generator {
             },
         } }
 
-        let imports_code = imports.join("\n");
-        let exports_code = exports.join("\n");
+
 
         Ok(format!(
 r#"{GENERATED_FILE_WARNING}
 {imports_code}
 
 {exports_code}
-"#
+"#,
+            imports_code = imports.join("\n"),
+            exports_code = exports.join("\n"),
         ))
     }
 
