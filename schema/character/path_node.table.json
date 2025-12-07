@@ -2,8 +2,8 @@
     "$schema": "../../syntax/table.json",
     "name": "PathNode",
     "kind": "concrete",
-    "workbook": "weapon.ods",
-    "sheet": "Weapon",
+    "workbook": "path_node.ods",
+    "sheet": "PathNode",
     "fields": [
         {
             "name": "id",
