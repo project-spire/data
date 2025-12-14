@@ -1,0 +1,19 @@
+{
+    "$schema": "../../syntax/table.json",
+    "name": "Skill",
+    "kind": "abstract",
+    "fields": [
+        {
+            "name": "id",
+            "kind": "scalar",
+            "type": "id",
+            "target": "all"
+        },
+        {
+            "name": "name",
+            "kind": "scalar",
+            "type": "string",
+            "target": "client"
+        }
+    ]
+}

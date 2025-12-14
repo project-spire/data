@@ -63,10 +63,23 @@
                 },
                 {
                     "properties": {
+                        "kind": { "const": "union" },
+                        "type": { "type": "string" }
+                    },
+                    "required": ["kind", "type"]
+                },
+                {
+                    "properties": {
                         "kind": { "const": "link" },
                         "type": { "type": "string" }
                     },
                     "required": ["kind", "type"]
+                },
+                {
+                    "properties": {
+                        "kind": { "const": "json" }
+                    },
+                    "required": ["kind"]
                 }
             ],
             "required": ["name", "kind", "type", "target"],

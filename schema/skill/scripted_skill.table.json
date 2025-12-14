@@ -1,0 +1,15 @@
+{
+    "$schema": "../../syntax/table.json",
+    "name": "ScriptedSkill",
+    "kind": "concrete",
+    "extend": "skill::Skill",
+    "workbook": "skill.ods",
+    "sheet": "ScriptedSkill",
+    "fields": [
+        {
+            "name": "attributes",
+            "kind": "json",
+            "target": "all"
+        }
+    ]
+}

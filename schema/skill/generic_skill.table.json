@@ -1,0 +1,25 @@
+{
+    "$schema": "../../syntax/table.json",
+    "name": "GenericSkill",
+    "kind": "concrete",
+    "extend": "skill::Skill",
+    "workbook": "skill.ods",
+    "sheet": "GenericSkill",
+    "fields": [
+        {
+            "name": "effects",
+            "kind": "link",
+            "type": "skill::SkillEffect",
+            "target": "all",
+            "multi": true
+        },
+        {
+            "name": "costs",
+            "kind": "union",
+            "type": "skill::SkillCost",
+            "target": "all",
+            "optional": true,
+            "multi": true
+        }
+    ]
+}
