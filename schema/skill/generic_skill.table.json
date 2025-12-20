@@ -1,5 +1,6 @@
 {
     "$schema": "../../syntax/table.json",
+    "enabled": false,
     "name": "GenericSkill",
     "kind": "concrete",
     "extend": "skill::Skill",
@@ -18,7 +19,6 @@
             "kind": "union",
             "type": "skill::SkillCost",
             "target": "all",
-            "optional": true,
             "multi": true
         }
     ]

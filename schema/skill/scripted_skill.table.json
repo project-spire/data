@@ -1,5 +1,6 @@
 {
     "$schema": "../../syntax/table.json",
+    "enabled": false,
     "name": "ScriptedSkill",
     "kind": "concrete",
     "extend": "skill::Skill",
@@ -8,7 +9,8 @@
     "fields": [
         {
             "name": "attributes",
-            "kind": "json",
+            "kind": "scalar",
+            "type": "json",
             "target": "all"
         }
     ]

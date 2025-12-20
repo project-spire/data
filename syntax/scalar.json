@@ -16,7 +16,8 @@
             "float64",
             "str",
             "datetime",
-            "duration"
+            "duration",
+            "json"
         ] }
     }
 }
