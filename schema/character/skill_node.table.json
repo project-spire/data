@@ -1,0 +1,21 @@
+{
+    "$schema": "../../syntax/table.json",
+    "name": "SkillNode",
+    "kind": "concrete",
+    "workbook": "skill_node.ods",
+    "sheet": "SkillNode",
+    "fields": [
+        {
+            "name": "id",
+            "kind": "scalar",
+            "type": "id",
+            "target": "all"
+        },
+        {
+            "name": "name",
+            "kind": "scalar",
+            "type": "string",
+            "target": "client"
+        }
+    ]
+}
