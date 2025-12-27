@@ -1,9 +1,9 @@
 {
     "$schema": "../../syntax/table.json",
-    "name": "TalentNode",
+    "name": "Talent",
     "kind": "concrete",
-    "workbook": "talent_node.ods",
-    "sheet": "TalentNode",
+    "workbook": "talent.ods",
+    "sheet": "Talent",
     "fields": [
         {
             "name": "id",
