@@ -1,0 +1,13 @@
+{
+    "$schema": "../../syntax/enum.json",
+    "name": "BiomeType",
+    "base": "uint8",
+    "enums": [
+        "Plain",
+        "Desert",
+        "Taiga",
+        "Tundra"
+    ],
+    "target": "all",
+    "protocol": true
+}
