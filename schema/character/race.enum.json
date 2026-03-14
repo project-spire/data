@@ -8,6 +8,6 @@
         "Orc"
     ],
     "target": "all",
-    "protocol": true,
+    "protobuf": true,
     "queryable": true
 }

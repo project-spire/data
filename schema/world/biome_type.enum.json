@@ -9,5 +9,5 @@
         "Tundra"
     ],
     "target": "all",
-    "protocol": true
+    "protobuf": true
 }

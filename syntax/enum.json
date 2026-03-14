@@ -14,7 +14,7 @@
         },
         "target": { "enum": ["client", "server", "all"] },
         "desc": { "type": "string" },
-        "protocol": { "type": "boolean" },
+        "protobuf": { "type": "boolean" },
         "queryable": { "type": "boolean" }
     },
     "required": ["name", "base", "enums", "target"],
