@@ -1,0 +1,16 @@
+[
+    {
+        "name": "SampleConst1",
+        "scalar_type": "int32",
+        "target": "all",
+        "value": 123,
+        "desc": "sample integer constant"
+    },
+    {
+        "name": "SampleConst2",
+        "scalar_type": "string",
+        "target": "all",
+        "value": "Hello, Sample!",
+        "desc": "sample string constant"
+    }
+]
